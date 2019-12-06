@@ -22,14 +22,14 @@ from numba import jit, njit
 def distance(la1, lo1, lat2, lon2):
     # Computes the Haversine distance between two points.
 
-    radians, sin, cos, arcsin, sqrt, degrees = np.radians,np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
+    radians, sin, cos, arcsin, sqrt, degrees = np.radians, np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
 
-    x1 = radians(lo1)
-    y1 = radians(la1)
-    x2 = radians(lon2)
-    y2 = radians(lat2)
+    x0 = radians(lo1)
+    y0 = radians(la1)
+    xr = radians(lon2)
+    yr = radians(lat2)
 
-    a = sin((y2 - y1)/2.0)**2.0 + (cos(y1)*cos(y2)*(sin((x2 - x1)/2.0)**2.0))
+    a = sin((yr - y0)/2.0)**2.0 + (cos(y0)*cos(yr)*(sin((xr - x0)/2.0)**2.0))
     angle2 = 2.0*arcsin(sqrt(a))
     angle2 = degrees(angle2)
 
@@ -67,7 +67,8 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
     t1 = 0.0
     v, vn = 0.0, 0.0
     e = np.array([[0.0, 0.0], [0.0, 0.0]])
-    degrees, sqrt, cos, sin, radians, arcsin, argmin = np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
+    degrees, sqrt, cos, sin, radians, arcsin, argmin = \
+        np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
     for tt in range(0, daycount):
         # Set array of 'today's' innovations
         xxi = xti[tt]
@@ -76,13 +77,14 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
         if len(zzi) <= 10:
             continue
         rmin = argmin(distance(yyi, xxi, yy, xx))
-        xxi = degrees(2 * arcsin(sqrt(cos(radians(yyi))*cos(radians(yy))* sin((radians(xxi - xx) / 2))**2)))
-        yyi = yyi - yy  # Postive and negative, not absolute because squared later.
+        xxi = degrees(2 * arcsin(sqrt(cos(radians(yyi))*cos(radians(yy)) * sin((radians(xxi - xx) / 2))**2)))
+        yyi = yyi - yy  # Positive and negative, not absolute because squared later.
         v0 = zzi[rmin]
         t0, t1, e = inner(xxi, yyi, zzi, v0, i0, i1, e, t0, t1)
         v += v0**2
         vn += 1
     return t0, t1, e, v/vn
+
 
 #  Creating the coarse grid for storing the innovations and producing output. In both 1d and 2d arrays.
 
@@ -102,11 +104,12 @@ y2 = np.zeros((len(yedges) - 1, len(xedges) - 1))
 for p in range(0, len(xedges) - 1, 1):
     y2[:, p] = yedges[:-1]
 
-Seasonlist = ["2-MAM"] #, "3-JJA", "4-SON"]
+Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 Overwrite = True
-a1=4  #  Long length-scale, in degrees.
+a1 = 4  # Long length-scale, in degrees.
 
-# Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-convert-kilometres-to-degrees-in-geodjango-geos
+#  Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-conv
+#  ert-kilometres-to-degrees-in-geodjango-geos
 
 size = []
 TIME = []
@@ -182,11 +185,11 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
                 xi = []
                 yi = []
                 zi = []
-                for t in range(0,dayCount):  #  'Box Cut', removes all values more than 9 degrees in x or y.
-                    idd = np.logical_and(abs(Xi[t] - x) <= 9, abs(Yi[t] - y) <= 9)
-                    xi.append(Xi[t][idd])
-                    yi.append(Yi[t][idd])
-                    zi.append(Zi[t][idd])
+                for t in range(0, dayCount):  # 'Box Cut', removes all values more than 9 degrees in x or y.
+                    idi = np.logical_and(abs(Xi[t] - x) <= 9, abs(Yi[t] - y) <= 9)
+                    xi.append(Xi[t][idi])
+                    yi.append(Yi[t][idi])
+                    zi.append(Zi[t][idi])
 
                 T0, T1, E, V = time_loop(xi, yi, zi, x, y, a0, a1, dayCount)
                 E = np.linalg.inv(E)
@@ -219,6 +222,6 @@ m = 0
 for N in nlist:
     for p2 in range(len(Seasonlist)):
         txt.write('  %7.2f   |  %5.2f   |     %s    |    %i\n' % (
-            TIME[p2+m], 1/N, Seasonlist[p2], size[p2+m]))
+            TIME[p2+m], 1/N, Seasonlist[p2], int(size[p2+m])))
     m += len(Seasonlist)
 txt.close()

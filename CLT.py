@@ -13,8 +13,8 @@ cova = []
 corr = []
 vari = []
 
-a=0
-b=0.7
+a = 0
+b = 0.7
 Bscale = 0  # 0 equals no bias
 
 tmp=0

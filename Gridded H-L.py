@@ -4,14 +4,12 @@ import random
 import numpy as np
 import numpy.ma as ma
 import datetime
-# from netCDF4 import Dataset
 from scipy.optimize import curve_fit
-# import scipy.interpolate as interpolate
 from numba import jit, njit
 
 ########################################################################################################################
 #
-#  Non-gridded IPA.npy
+#  Gridded H-L.npy
 #
 #  This script runs the gridded 1D isotropic Hollingsworth and Lonnberg for Seasons in
 #  Seasonlist, with N percentage of observations. Prior to this script running there are
@@ -21,37 +19,39 @@ from numba import jit, njit
 #
 ########################################################################################################################
 
+
 @njit('f8[:,:](f8, f8, f8[:], f8[:])', parallel=True, fastmath=True)
 def distance(la1, lo1, lat2, lon2):
     # Computes the Haversine distance between two points.
 
-    lon1 = np.zeros((len(lon2) , len(lat2)))
-    for p in range(0, len(lat2) , 1):
-        lon1[:, p] = lon2[:]
+    lon1 = np.zeros((len(lon2), len(lat2)))
+    for pr in range(0, len(lat2), 1):
+        lon1[:, pr] = lon2[:]
     lon1 = np.transpose(lon1)
 
-    lat1 = np.zeros((len(lat2) , len(lon2)))
-    for p in range(0, len(lon2) , 1):
-        lat1[:, p] = lat2[:]
+    lat1 = np.zeros((len(lat2), len(lon2)))
+    for pr in range(0, len(lon2), 1):
+        lat1[:, pr] = lat2[:]
 
-    radians, sin, cos, arcsin, sqrt, degrees = np.radians,np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
+    radians, sin, cos, arcsin, sqrt, degrees = np.radians, np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
 
-    x1 = radians(lo1)
-    y1 = radians(la1)
-    x2 = radians(lon1)
-    y2 = radians(lat1)
+    x0 = radians(lo1)
+    y0 = radians(la1)
+    xr = radians(lon1)
+    yr = radians(lat1)
 
-    a = sin((y2 - y1)/2.0)**2.0 + (cos(y1)*cos(y2)*(sin((x2 - x1)/2.0)**2.0))
+    a = sin((yr - y0)/2.0)**2.0 + (cos(y0)*cos(yr)*(sin((xr - x0)/2.0)**2.0))
     angle2 = 2.0*arcsin(sqrt(a))
     angle2 = degrees(angle2)
 
-    return 1852.0*60.0*angle2
+    return angle2
 
 
 @jit('f8[:,:,:](i8, i8[:], i8[:], i8[:], f8[:], f8[:,:])', forceobj=True)
 def griddata(daycount, dayidx, latidx, lonidx, sst, gridmean):
     # Combines all the data into a 2D grid that has the size of the computational grid times the number of days.
-    # The values at each entry is the average of all the values (minus the global mean) in one day that fall into each grid cell.
+    # The values at each entry is the average of all the values (minus the global mean) in one day that fall into
+    # each grid cell.
 
     allgriddedvalues = np.zeros((gridmean.shape[0], gridmean.shape[1], daycount))
 
@@ -88,7 +88,7 @@ def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
 
     for laidx2, lat2 in enumerate(lat):
         for loidx2, lon2 in enumerate(lon):
-            if d[laidx2,loidx2] <= 900000:
+            if d[laidx2, loidx2] <= 900000:
                 v1 = allgriddedvalues[laidx1, loidx1, :]
                 v2 = allgriddedvalues[laidx2, loidx2, :]
                 if np.isnan(v1*v2).all():
@@ -96,8 +96,8 @@ def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
                 valididx = np.logical_not(np.isnan(v1*v2))
                 provcorr = np.nanmean(v1*v2)
                 if not np.isnan(provcorr) and np.var(v2[valididx]) > 1e-10:
-                    fitcorr[int(d[laidx2,loidx2]/dd)] += provcorr
-                    fitcorrcount[int(d[laidx2,loidx2]/dd)] += 1
+                    fitcorr[int(d[laidx2, loidx2]/dd)] += provcorr
+                    fitcorrcount[int(d[laidx2, loidx2]/dd)] += 1
     fitcorrcount[fitcorrcount == 0] = np.nan
     return (fitcorr/fitcorrcount).flatten(), np.arange(31)*dd
 
@@ -132,11 +132,11 @@ for p in range(0, len(xedges) - 1, 1):
 # Ross = ross[np.where(ross <= 200000)]
 
 overwrite = True
-Dx = 30000  #  Bin size in metres.
+Dx = 30000  # Bin size in metres.
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
-dt = datetime.timedelta(hours=24) #  Time Step.
+dt = datetime.timedelta(hours=24)  # Time Step.
 TIME = []
 size = []
 for N in nlist:
@@ -160,11 +160,11 @@ for N in nlist:
             exit(0)
 
         os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
-        S1 = time.time() #  Time diagnostics
+        S1 = time.time()  # Time diagnostics
 
         os.chdir('%s' % season)
-        GRID  = np.load('coarse_grid_sst.npz')
-        Bias  = GRID['zi']
+        GRID = np.load('coarse_grid_sst.npz')
+        Bias = GRID['zi']
         gridz = ma.masked_invalid(Bias)
         gridindices = np.where(gridz.mask == False)
         GRID.close()
@@ -226,7 +226,7 @@ for N in nlist:
         #  Prepare arrays.
 
         STD = np.zeros(Bias.shape)
-        obs =  np.zeros(Bias.shape)
+        obs = np.zeros(Bias.shape)
         LSR = np.zeros(Bias.shape)
 
         for i, la2 in enumerate(ycenter):
@@ -243,7 +243,7 @@ for N in nlist:
                     validIdx = np.logical_not(np.isnan(cov))
                     validIdx[0] = False
                     try:
-                        def func(xx, xa, xb):  #  The function is created anew, as it is dependent on the Rossby radius.
+                        def func(xx, xa, xb):  # The function is created anew, as it is dependent on the Rossby radius.
                             return xa*np.exp(-(xx**2)/(2*ross[i, j]**2)) + xb*np.exp(-(xx**2)/(2*(444*1000)**2))
                         #  Apply the curve fitting, the function is from scipy.curve_fit.
                         popt, pcov = curve_fit(func, dist[validIdx], cov[validIdx], maxfev=100000000)
@@ -281,5 +281,3 @@ for N in nlist:
             TIME[p2 + m], 1/N, Seasonlist[p2], size[p2 + m]))
     m += len(Seasonlist)
 txt.close()
-
-

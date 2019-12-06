@@ -6,40 +6,39 @@ import numpy.ma as ma
 import datetime
 from numba import jit, njit
 
-#   HL-Process_Innovations.py is a python script created by Lewis Sampson. 3 of 6, Third.
+########################################################################################################################
+#  Gridded IPA.npy
 #
-#   The purpose of this script is calculate the error correlation value at zero separation for each grid point,
-#   according to the H-L method of error estimation.
+#  This script runs the Gridded 1D isotropic inner product analysis for Seasons in
+#  Seasonlist, with N percentage of observations. Prior to this script running there are
+#  files created in \\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\ and these are
+#  required for each season run. This includes .npz files for observations,
+#  coarse_grid_sst.npz (for the chosen seasons), and a rossby radius .npy file.
 #
-#   This method; is limited by a distance, has an option to overwrite current data for specific season, and writes out
-#   a .txt file with basic diagnostic information.
-#
-#   It is required that the coarse_grid.npz be up-to-date, for the chosen season, as this will determine which
-#   grid points the correlation is calculated for. This script also needs all available coarse_grid_sst dates to be
-#   processed
+########################################################################################################################
 
 
 @njit('f8[:,:](f8, f8, f8[:], f8[:])', parallel=True, fastmath=True)
 def distance(la1, lo1, lat2, lon2):
     # Computes the Haversine distance between two points.
 
-    lon1 = np.zeros((len(lon2) , len(lat2)))
-    for p in range(0, len(lat2) , 1):
-        lon1[:, p] = lon2[:]
+    lon1 = np.zeros((len(lon2), len(lat2)))
+    for pr in range(0, len(lat2), 1):
+        lon1[:, pr] = lon2[:]
     lon1 = np.transpose(lon1)
 
-    lat1 = np.zeros((len(lat2) , len(lon2)))
-    for p in range(0, len(lon2) , 1):
-        lat1[:, p] = lat2[:]
+    lat1 = np.zeros((len(lat2), len(lon2)))
+    for pr in range(0, len(lon2), 1):
+        lat1[:, pr] = lat2[:]
 
-    radians, sin, cos, arcsin, sqrt, degrees = np.radians,np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
+    radians, sin, cos, arcsin, sqrt, degrees = np.radians, np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
 
-    x1 = radians(lo1)
-    y1 = radians(la1)
-    x2 = radians(lon1)
-    y2 = radians(lat1)
+    x0 = radians(lo1)
+    y0 = radians(la1)
+    xr = radians(lon1)
+    yr = radians(lat1)
 
-    a = sin((y2 - y1)/2.0)**2.0 + (cos(y1)*cos(y2)*(sin((x2 - x1)/2.0)**2.0))
+    a = sin((yr - y0)/2.0)**2.0 + (cos(y0)*cos(yr)*(sin((xr - x0)/2.0)**2.0))
     angle2 = 2.0*arcsin(sqrt(a))
     angle2 = degrees(angle2)
 
@@ -49,7 +48,8 @@ def distance(la1, lo1, lat2, lon2):
 @jit('f8[:,:,:](i8, i8[:], i8[:], i8[:], f8[:], f8[:,:])', forceobj=True)
 def griddata(daycount, dayidx, latidx, lonidx, sst, gridmean):
     # Combines all the data into a 2D grid that has the size of the computational grid times the number of days.
-    # The values at each entry is the average of all the values (minus the global mean) in one day that fall into each grid cell.
+    # The values at each entry is the average of all the values (minus the global mean) in one day that fall into
+    # each grid cell.
 
     allgriddedvalues = np.zeros((gridmean.shape[0], gridmean.shape[1], daycount))
 
@@ -101,7 +101,7 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
     for tt in range(0, daycount):
         # Set array of 'today's' innovations
 
-        zzi = zti[:,:,tt]
+        zzi = zti[:, :, tt]
         d = distance(yti[yy], xti[xx], yti, xti)
         v0 = zzi[yy, xx]
         if ~np.isnan(v0):
@@ -116,6 +116,7 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
             vn += 1
 
     return t0, t1, e, v/vn
+
 
 #  Creating the coarse grid for storing the innovations and producing output. In both 1d and 2d arrays.
 
@@ -151,7 +152,7 @@ a1 = 4
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
-dt = datetime.timedelta(hours=24) #  Time Step.
+dt = datetime.timedelta(hours=24)  # Time Step.
 TIME = []
 size = []
 for N in nlist:
@@ -175,11 +176,11 @@ for N in nlist:
             exit(0)
 
         os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
-        S1 = time.time() #  Time diagnostics
+        S1 = time.time()  # Time diagnostics
 
         os.chdir('%s' % season)
-        GRID  = np.load('coarse_grid_sst.npz')
-        Bias  = GRID['zi']
+        GRID = np.load('coarse_grid_sst.npz')
+        Bias = GRID['zi']
         gridz = ma.masked_invalid(Bias)
         gridindices = np.where(gridz.mask == False)
         GRID.close()
@@ -241,7 +242,7 @@ for N in nlist:
         #  Prepare arrays.
 
         STD = np.zeros(Bias.shape)
-        obs =  np.zeros(Bias.shape)
+        obs = np.zeros(Bias.shape)
         LSR = np.zeros(Bias.shape)
 
         for j, lo2 in enumerate(xcenter):
@@ -293,5 +294,3 @@ for N in nlist:
             TIME[p2 + m], 1/N, Seasonlist[p2], size[p2 + m]))
     m += len(Seasonlist)
 txt.close()
-
-
