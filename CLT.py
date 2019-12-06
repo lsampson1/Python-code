@@ -3,7 +3,7 @@ from scipy.stats import expon
 import matplotlib.pyplot as plt
 
 
-N = [1000]
+N = [10]
 C = [1000]
 COV = False
 COR = False
