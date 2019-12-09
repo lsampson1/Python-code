@@ -76,8 +76,8 @@ def griddata(daycount, dayidx, latidx, lonidx, sst, gridmean):
 @jit('Tuple((f8[:],f8[:]))(f8, i8, i8, f8[:,:,:], f8[:], f8[:], f8[:,:])', forceobj=True)
 def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
 
-    fitcorr = np.zeros(int(30)+1)
-    fitcorrcount = np.zeros(int(30)+1)
+    fitcorr = np.zeros(31)
+    fitcorrcount = np.zeros(31)
 
     la1 = lat[laidx1]
     lo1 = lon[loidx1]

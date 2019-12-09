@@ -9,26 +9,26 @@ np.seterr(all='ignore')
 # Gaussian projection length-scale
 a0 = 0.25
 a1 = 4
-p=0
+p = 0
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 Overwrite = True
 Gridded = False
 
 if Gridded:
-    ipa_str1 = 'Data\IPA_Sdv_Grid.npy'
-    hl_str1 = 'Data\HL_Sdv_Grid.npy'
-    ipa_str2 = 'Data\IPA_Lsr_Grid.npy'
-    hl_str2 = 'Data\HL_Lsr_Grid.npy'
+    ipa_str1 = 'Data\\IPA_Sdv_Grid.npy'
+    hl_str1 = 'Data\\HL_Sdv_Grid.npy'
+    ipa_str2 = 'Data\\IPA_Lsr_Grid.npy'
+    hl_str2 = 'Data\\HL_Lsr_Grid.npy'
 else:
-    ipa_str1 = 'Data\IPA_Sdv_Real.npy'
-    hl_str1 = 'Data\HL_Sdv_Grid.npy'
-    ipa_str2 = 'Data\IPA_Lsr_Real.npy'
-    hl_str2 = 'Data\HL_Lsr_Grid.npy'
+    ipa_str1 = 'Data\\IPA_Sdv_Real.npy'
+    hl_str1 = 'Data\\HL_Sdv_Grid.npy'
+    ipa_str2 = 'Data\\IPA_Lsr_Real.npy'
+    hl_str2 = 'Data\\HL_Lsr_Grid.npy'
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
 
-nlist = [100/100] # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
 print('Nan values')
 print('--'*40)
@@ -112,7 +112,6 @@ for Season in Seasonlist:
             M = interpolate.griddata(points2.T, M2.flatten(), (x1, y1), 'nearest')
             M[gridz.mask == True] = np.nan
 
-
         ipaer = np.nanmean(abs(IPA - TRUIPA))
         lsrer = np.nanmean(abs(LSR - TRULSR))
         hler = np.nanmean(abs(HL - TRUHL))
@@ -150,7 +149,7 @@ for Season in Seasonlist:
     thl.append(hl)
     tlsr.append(lsr)
     thlr.append(hlr)
-    p +=1
+    p += 1
 
 ax[1].plot([0], c='k', label='IPA')
 ax[1].plot([0], c='k', linestyle=':', label='HL')
@@ -169,7 +168,7 @@ plt.figure('Average concordence - LSR')
 plt.title('Yearly average - LSR')
 plt.plot((100/np.array(nlist)), np.mean(tlsr, axis=0), c='k', label='IPA')
 plt.plot((100/np.array(nlist)), np.mean(thlr, axis=0), c='k', linestyle=':', label='HL')
-plt.ylabel ('%')
-plt.xlabel ('%')
+plt.ylabel('%')
+plt.xlabel('%')
 plt.legend()
 plt.show()
