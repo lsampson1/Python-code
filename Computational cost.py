@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics')
 
-for name in ['Real','Gridded']:
-    for typ in ['HL','IPA']:
+for name in ['Real', 'Gridded']:
+    for typ in ['HL', 'IPA']:
         x = []
         y = []
         z = []
