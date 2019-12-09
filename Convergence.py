@@ -33,7 +33,7 @@ nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 print('Nan values')
 print('--'*40)
 dt = datetime.timedelta(hours=24)
-fig, ax = plt.subplots(2, figsize=(8,6))
+fig, ax = plt.subplots(2, figsize=(8, 6))
 plt.title('test')
 
 tipa = []
@@ -160,8 +160,8 @@ plt.figure('Average concordence - SDV')
 plt.title('Yearly average - SDV')
 plt.plot((100/np.array(nlist)), np.mean(tipa, axis=0), c='k', label='IPA')
 plt.plot((100/np.array(nlist)), np.mean(thl, axis=0), c='k', linestyle=':', label='HL')
-plt.ylabel ('%')
-plt.xlabel ('%')
+plt.ylabel('%')
+plt.xlabel('%')
 plt.legend()
 
 plt.figure('Average concordence - LSR')
