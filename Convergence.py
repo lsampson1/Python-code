@@ -27,7 +27,6 @@ else:
     hl_str2 = 'Data\\HL_Lsr_Grid.npy'
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
-
 nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
 print('Nan values')
