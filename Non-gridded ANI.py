@@ -25,10 +25,9 @@ def distance(la1, lo1, lat2, lon2):
     return angle2
 
 
-@jit('Tuple((f8, f8[:,:], f8))(f8[:], f8[:], f4[:], f8, f8, f4, i8, i8)', forceobj=True)
+@jit('Tuple((f8, f8[:,:]))(f8[:], f8[:], f4[:], f8, f8, f4, i8, i8)', forceobj=True)
 def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
     tot = np.zeros(4)
-    v, vn = 0.0, 0.0
     e = np.zeros((4, 4))
     degrees, sqrt, cos, sin, radians, arcsin, argmin = \
         np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
@@ -47,7 +46,7 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
     return tot, e
 
 
-@njit('Tuple((f8[:], f8[:,:])(f8[:], f8[:], f4[:], f4, f8[:], f8[:,:], f8, i8)', parallel=True, fastmath=True)
+@njit('Tuple((f8[:], f8[:,:]))(f8[:], f8[:], f4[:], f4, f8[:], f8[:,:], f8, i8)', parallel=True, fastmath=True)
 def inner(xxi, yyi, zzi, v0, tot, e, i0, i1):
 
     exp, summ = np.exp, np.sum
@@ -114,7 +113,7 @@ xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 # Gaussian projection length-scale
 a1 = 4
 
-Overwrite = True
+Overwrite = False
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\coarse_grid_sst\2014')
 
@@ -215,20 +214,24 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
         M2 = np.load("M2.npy")
         M3 = np.load("M3.npy")
 
+        for M in [M0, M1, M2, M3]:
+            M[M == 0] = np.nan
+
     V = M0 + M1 + M2 + M3
     W1 = (M0 + M1)/V
     V1 = M0/(M0 + M1)
     V2 = M2/(M2 + M3)
     plt.figure(1)
-    plt.pcolormesh(V, cmap='jet', vmin=-1, vmax=1)
-    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V[~np.isnan(V)], 5), np.percentile(V[~np.isnan(V)], 95)))
+    plt.pcolormesh(np.sqrt(V), cmap='jet', vmin=0.2, vmax=0.8)
+    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(np.sqrt(V[~np.isnan(np.sqrt(V))]), 5),
+                                              np.percentile(np.sqrt(V[~np.isnan(np.sqrt(V))]), 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('V.png')
     plt.close()
 
     plt.figure(2)
-    plt.pcolormesh(W1, cmap='jet', vmin=-1, vmax=1)
+    plt.pcolormesh(W1, cmap='jet', vmin=0, vmax=1.5)
     plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(W1[~np.isnan(W1)], 5), np.percentile(W1[~np.isnan(W1)], 95)))
     plt.colorbar()
     plt.tight_layout()
@@ -236,7 +239,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     plt.close()
 
     plt.figure(3)
-    plt.pcolormesh(V1, cmap='jet', vmin=-1, vmax=1)
+    plt.pcolormesh(V1, cmap='jet', vmin=-0.2, vmax=1.2)
     plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V1[~np.isnan(V1)], 5), np.percentile(V1[~np.isnan(V1)], 95)))
     plt.colorbar()
     plt.tight_layout()
@@ -244,7 +247,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     plt.close()
 
     plt.figure(4)
-    plt.pcolormesh(V2, cmap='jet', vmin=-1, vmax=1)
+    plt.pcolormesh(V2, cmap='jet', vmin=-2, vmax=2)
     plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V2[~np.isnan(M3)], 5), np.percentile(V2[~np.isnan(V2)], 95)))
     plt.colorbar()
     plt.tight_layout()
