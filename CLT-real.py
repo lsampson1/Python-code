@@ -5,15 +5,17 @@ import matplotlib.pyplot as plt
 
 Seasonlist = ["1-DJF"]
 
+bins = np.linspace(8, 32, 121)
+bin_means = []
+bin_center = 0.5 * (bins[1:] + bins[:-1])
 dt = datetime.timedelta(hours=24)
 for N in [1]:  # Use every Nth observation. (N=1 is every observation)
     size = np.zeros((len(Seasonlist)))
 
     for Season in Seasonlist:
         zi = []
-        yi = []
         xi = []
-
+        yi = []
         if Season == '1-DJF':
             Start = datetime.date(2013, 12,  1)
             End = datetime.date(2014, 3, 1)
@@ -51,36 +53,32 @@ for N in [1]:  # Use every Nth observation. (N=1 is every observation)
             yi.append(np.array([x for _, x in sorted(zip(tmpy, tmpy))]))
             dat.close()
 
-bin = np.linspace(8, 32, 121)
-bin_means = []
-bin_center = 0.5 * (bin[1:] + bin[:-1])
+        for d in range(len(yi)):
+            digitized = np.digitize(yi[d], bins)
+            bin_means.append([zi[d][digitized == i].mean() for i in range(1, len(bins))])
 
+        tmp = np.array(bin_means)
 
-for d in range(len(yi)):
-    digitized = np.digitize(yi[d], bin)
-    bin_means.append([zi[d][digitized == i].mean() for i in range(1, len(bin))])
+        cov = np.nanmean((tmp - np.nanmean(tmp, axis=0)).T*(tmp[:, 60] - np.nanmean(tmp[:, 60])), axis=1)
 
-tmp = np.array(bin_means)
+        corr = cov / (np.sqrt(np.nanmean(tmp**2, axis=0)-np.nanmean(tmp, axis=0)**2)*np.sqrt(np.nanmean(tmp[:, 60]**2) -
+                                                                                             np.nanmean(tmp[:, 60])**2))
 
-cov = np.nanmean((tmp - np.nanmean(tmp, axis=0)).T*(tmp[:, 60] - np.nanmean(tmp[:, 60])), axis=1)
+        plt.figure(1)
+        data = np.nanmean(tmp, axis=0)
+        tmpdata = data.copy()
+        tmpdata[np.isnan(tmpdata)] = 0
 
-corr = cov / (np.sqrt(np.nanmean(tmp**2, axis=0)-np.nanmean(tmp, axis=0)**2)*np.sqrt(np.nanmean(tmp[:, 60]**2)-np.nanmean(tmp[:, 60])**2))
+        plt.plot(bin_center, data, label='Data (mean)')
+        plt.plot(bin_center, cov, label='Covariance')
+        plt.plot(bin_center, corr, label='Correlation')
+        plt.title('Innovation statistics (y-Hx)')
+        plt.xlabel('latitude (degrees)')
+        plt.legend()
 
-plt.figure(1)
-data = np.nanmean(tmp, axis=0)
-tmpdata = data.copy()
-tmpdata[np.isnan(tmpdata)] = 0
-
-plt.plot(bin_center, data, label='Data (mean)')
-plt.plot(bin_center, cov, label='Covariance')
-plt.plot(bin_center, corr, label='Correlation')
-plt.title('Innovation statistics (y-Hx)')
-plt.xlabel('latitude (degrees)')
-plt.legend()
-
-plt.figure(2)
-plt.hist([data[~np.isnan(data)], cov[~np.isnan(cov)], corr[~np.isnan(corr)]], 20, range=(-1, 1),
-         label=['Data (mean)', 'Covariance', 'Correlation'])
-plt.title('Density of distribution')
-plt.legend()
-plt.show()
+        plt.figure(2)
+        plt.hist([data[~np.isnan(data)], cov[~np.isnan(cov)], corr[~np.isnan(corr)]], 20, range=(-1, 1),
+                 label=['Data (mean)', 'Covariance', 'Correlation'])
+        plt.title('Density of distribution')
+        plt.legend()
+        plt.show()

@@ -39,7 +39,7 @@ def distance(la1, lo1, lat2, lon2):
 @njit('Tuple((f8, f8, f8[:,:]))(f8[:], f8[:], f4[:], f4, f4, i8, f8[:,:], f8, f8)', parallel=True, fastmath=True)
 def inner(xxi, yyi, zzi, v0, i0, i1, e, t0, t1):
 
-    idd = ((yyi*yyi + xxi*xxi) * (40000 / 360)) < 810000
+    idd = (yyi + xxi) < 81
     exp, sm = np.exp, np.sum
     z = zzi[idd]
     xxi = xxi[idd]
@@ -47,8 +47,8 @@ def inner(xxi, yyi, zzi, v0, i0, i1, e, t0, t1):
 
     idd = (z != v0)
 
-    ya = exp(-(xxi[idd] * xxi[idd] + yyi[idd] * yyi[idd]) / (2 * i0 * i0))
-    yb = exp(-(xxi[idd] * xxi[idd] + yyi[idd] * yyi[idd]) / (2 * i1 * i1))
+    ya = exp(-(xxi[idd] + yyi[idd]) / (2 * i0 * i0))
+    yb = exp(-(xxi[idd] + yyi[idd]) / (2 * i1 * i1))
 
     e[0, 0] += sm(ya * ya)
     e[1, 0] += sm(ya * yb)
@@ -80,7 +80,7 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
         xxi = degrees(2 * arcsin(sqrt(cos(radians(yyi))*cos(radians(yy)) * sin((radians(xxi - xx) / 2))**2)))
         yyi = yyi - yy  # Positive and negative, not absolute because squared later.
         v0 = zzi[rmin]
-        t0, t1, e = inner(xxi, yyi, zzi, v0, i0, i1, e, t0, t1)
+        t0, t1, e = inner(xxi*xxi, yyi*yyi, zzi, v0, i0, i1, e, t0, t1)
         v += v0**2
         vn += 1
     return t0, t1, e, v/vn
@@ -94,15 +94,6 @@ stepx = int((75 - 45) / 0.3)
 xedges = np.linspace(45, 75, int(stepx))
 ycenter = 0.5 * (yedges[1:] + yedges[:-1])
 xcenter = 0.5 * (xedges[1:] + xedges[:-1])
-
-x2 = np.zeros((len(xedges) - 1, len(yedges) - 1))
-for p in range(0, len(yedges) - 1, 1):
-    x2[:, p] = xedges[:-1]
-x2 = np.transpose(x2)
-
-y2 = np.zeros((len(yedges) - 1, len(xedges) - 1))
-for p in range(0, len(xedges) - 1, 1):
-    y2[:, p] = yedges[:-1]
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 Overwrite = True
