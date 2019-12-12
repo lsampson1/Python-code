@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import math
 import datetime
 import numpy.ma as ma
 import time
@@ -26,7 +25,7 @@ def distance(la1, lo1, lat2, lon2):
     return angle2
 
 
-# @jit('Tuple((f8, f8[:,:], f8))(f8[:], f8[:], f4[:], f8, f8, f4, i8, i8)', forceobj=True)
+@jit('Tuple((f8, f8[:,:], f8))(f8[:], f8[:], f4[:], f8, f8, f4, i8, i8)', forceobj=True)
 def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
     tot = np.zeros(4)
     v, vn = 0.0, 0.0
@@ -44,14 +43,14 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
         xxi = (degrees(2 * arcsin(sqrt(cos(radians(yyi))*cos(radians(yy)) * sin((radians(xxi - xx) / 2))**2))))**2
         yyi = (yyi - yy)**2  # Positive and negative, not absolute because squared later.
         v0 = zzi[rmin]
-        tot, e, yaa, ybb = inner(xxi, yyi, zzi, v0, tot, e, i0, i1)
+        tot, e = inner(xxi, yyi, zzi, v0, tot, e, i0, i1)
     return tot, e
 
 
-@njit('Tuple((f8[:], f8[:,:], f8[:], f8[:]))(f8[:], f8[:], f4[:], f4, f8[:], f8[:,:], f8, i8)', parallel=True, fastmath=True)
+@njit('Tuple((f8[:], f8[:,:])(f8[:], f8[:], f4[:], f4, f8[:], f8[:,:], f8, i8)', parallel=True, fastmath=True)
 def inner(xxi, yyi, zzi, v0, tot, e, i0, i1):
 
-    exp = np.exp
+    exp, summ = np.exp, np.sum
 
     idx = (xxi + yyi) < 81
 
@@ -70,37 +69,37 @@ def inner(xxi, yyi, zzi, v0, tot, e, i0, i1):
     yba = exp(-xxi / (2 * i1 ** 2)) * exp(-yyi / (2 * i0 ** 2))
     ybb = exp(-xxi / (2 * i1 ** 2)) * exp(-yyi / (2 * i1 ** 2))
 
-    ia0 = sum(yaa * z * v0)
-    ia1 = sum(ybb * z * v0)
-    ia2 = sum(yab * z * v0)
-    ia3 = sum(yba * z * v0)
+    ia0 = summ(yaa * z * v0)
+    ia1 = summ(ybb * z * v0)
+    ia2 = summ(yab * z * v0)
+    ia3 = summ(yba * z * v0)
 
-    e[0, 0] += sum(yaa * yaa)
-    e[1, 0] += sum(yaa * ybb)
-    e[0, 1] += sum(yaa * ybb)
-    e[2, 0] += sum(yaa * yab)
-    e[0, 2] += sum(yaa * yab)
-    e[3, 0] += sum(yaa * yba)
-    e[0, 3] += sum(yaa * yba)
+    e[0, 0] += summ(yaa * yaa)
+    e[1, 0] += summ(yaa * ybb)
+    e[0, 1] += summ(yaa * ybb)
+    e[2, 0] += summ(yaa * yab)
+    e[0, 2] += summ(yaa * yab)
+    e[3, 0] += summ(yaa * yba)
+    e[0, 3] += summ(yaa * yba)
 
-    e[1, 1] += sum(ybb * ybb)
-    e[1, 2] += sum(ybb * yab)
-    e[2, 1] += sum(ybb * yab)
-    e[1, 3] += sum(ybb * yba)
-    e[3, 1] += sum(ybb * yba)
+    e[1, 1] += summ(ybb * ybb)
+    e[1, 2] += summ(ybb * yab)
+    e[2, 1] += summ(ybb * yab)
+    e[1, 3] += summ(ybb * yba)
+    e[3, 1] += summ(ybb * yba)
 
-    e[2, 2] += sum(yab * yab)
-    e[2, 3] += sum(yab * yba)
-    e[3, 2] += sum(yab * yba)
+    e[2, 2] += summ(yab * yab)
+    e[2, 3] += summ(yab * yba)
+    e[3, 2] += summ(yab * yba)
 
-    e[3, 3] += sum(yba * yba)
+    e[3, 3] += summ(yba * yba)
 
     tot[0] += ia0
     tot[1] += ia1
     tot[2] += ia2
     tot[3] += ia3
 
-    return tot, e, yaa, ybb
+    return tot, e
 
 
 #  Creating the coarse grid for storing the innovations and producing output. In both 1d and 2d arrays.
@@ -113,7 +112,6 @@ ycenter = 0.5 * (yedges[1:] + yedges[:-1])
 xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
 # Gaussian projection length-scale
-a0 = 0.25
 a1 = 4
 
 Overwrite = True
@@ -203,8 +201,6 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
                 M1[j, i] = mm[1]
                 M2[j, i] = mm[2]
                 M3[j, i] = mm[3]
-
-                print(time.time() - S2)
 
         os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s' % Season)
         np.save("M0.npy", np.array(M0))
