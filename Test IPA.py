@@ -26,16 +26,16 @@ def distance(la1, lo1, lat2, lon2):
     return angle2
 
 
-# @njit('Tuple((f8, f8, f8[:,:]))( f8[:], f4[:], f4, f4, i8, f8[:,:], f8, f8)', parallel=True, fastmath=True)
+@njit('Tuple((f8, f8, f8[:,:]))( f8[:], f4[:], f8[:], f8[:,:], f8, f8)', parallel=True, fastmath=True)
 def inner(ri, zzi, r1, z, n, m):
 
-    idd = np.logical_and(ri > n, ri <m)
+    idd = np.logical_and(ri > n, ri < m)
 
-    z= np.append(z, zzi[idd])
+    z = np.append(z, zzi[idd])
     r1 = np.append(r1, ri[idd])
     mz = np.mean(zzi[idd])
     mr = np.mean(ri[idd])
-    plt.plot(np.mean(ri[idd]), np.mean(zzi[idd]), c = 'k', marker='+')
+    plt.plot(np.mean(ri[idd]), np.mean(zzi[idd]), c='k', marker='+')
 
     return r1, z, mz, mr
 
@@ -43,16 +43,18 @@ def inner(ri, zzi, r1, z, n, m):
 def f(c, std, lsr, i0, i1):
     return std*(lsr*np.exp(-(c*c)/(2*i0*i0)) + (1-lsr)*np.exp(-(c*c)/(2*i1*i1)))
 
-#@jit('Tuple((f8, f8, f8[:,:], f8))(f8[:], f8[:], f8[:], f8, f8, f4, i8, i8)', forceobj=True)
+
+@jit('Tuple((f8, f8, f8[:,:], f8))(f8[:], f8[:], f8[:], f8, f8, f4, i8, i8, f8, f8)', forceobj=True)
 def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount, std, lsr):
     r1 = np.array(0)
     z = np.array(0)
     mr = np.array(0)
     mz = np.array(0)
-    n=0.5
-    m=0.51
+    n = 0
+    m = 4
 
-    degrees, sqrt, cos, sin, radians, arcsin, argmin = np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
+    degrees, sqrt, cos, sin, radians, arcsin, argmin = \
+        np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
     for tt in range(0, daycount):
         # Set array of 'today's' innovations
         xxi = xti[tt]
@@ -67,16 +69,17 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount, std, lsr):
         mz = np.append(mz, mzt)
         mr = np.append(mr, mrt)
 
-    x = np.linspace(n, m, 100)
+    r = np.linspace(n, m, 100)
 
-    plt.plot(x, f(x, std, lsr, i0, i1))
-    plt.scatter(r1[1:], z[1:], c = 'r', s = 0.1)
+    plt.plot(r, f(r, std, lsr, i0, i1))
+    plt.scatter(r1[1:], z[1:], c='r', s=0.1)
     plt.figure(2)
     plt.hist(mz[1:], bins=20)
     plt.show()
     return
-#  Creating the coarse grid for storing the innovations and producing output. In both 1d and 2d arrays.
 
+
+#  Creating the coarse grid for storing the innovations and producing output. In both 1d and 2d arrays.
 stepy = int((32 - 8) / 0.274)
 yedges = np.linspace(8, 32, int(stepy))
 stepx = int((75 - 45) / 0.3)
@@ -93,14 +96,15 @@ y2 = np.zeros((len(yedges) - 1, len(xedges) - 1))
 for p in range(0, len(xedges) - 1, 1):
     y2[:, p] = yedges[:-1]
 
-Seasonlist = ["1-DJF" ] #, "2-MAM", "3-JJA", "4-SON"]
+Seasonlist = ["1-DJF"]  # , "2-MAM", "3-JJA", "4-SON"]
 Overwrite = True
-a1=4  #  Long length-scale, in degrees.
+a1 = 4  # Long length-scale, in degrees.
 
-# Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-convert-kilometres-to-degrees-in-geodjango-geos
+#  Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-conv
+#  ert-kilometres-to-degrees-in-geodjango-geos
 
 dt = datetime.timedelta(hours=24)
-nlist = [100/100] # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 for N in nlist:  # Use every Nth observation. (N=1 is every observation)
     for Season in Seasonlist:
         S1 = time.time()
@@ -167,14 +171,14 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
                 xi = []
                 yi = []
                 zi = []
-                for t in range(0,dayCount):  #  'Box Cut', removes all values more than 9 degrees in x or y.
+                for t in range(0, dayCount):  # 'Box Cut', removes all values more than 9 degrees in x or y.
                     idd = np.logical_and(abs(Xi[t] - x) <= 9, abs(Yi[t] - y) <= 9)
                     xi.append(Xi[t][idd])
                     yi.append(Yi[t][idd])
                     zi.append(Zi[t][idd])
 
-                time_loop(xi, yi, zi, x, y, a0, a1, dayCount, STD[j,i], LSR[j,i])
-
+                time_loop(xi, yi, zi, x, y, a0, a1, dayCount, STD[j, i], LSR[j, i])
+                print(1)
         LSR[LSR == 0] = np.nan
         STD[STD == 0] = np.nan
         obs[obs == 0] = np.nan

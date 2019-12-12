@@ -8,7 +8,7 @@ import scipy.interpolate as interpolate
 from netCDF4 import Dataset
 
 
-def cgrid2mgrid(variable, sea, sigma, dst, gridx2, gridy2):
+def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2):
 
     cwdi = os.getcwd()
     os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
@@ -160,7 +160,7 @@ for i in range(0, len(gridX1) - 1, 1):
     gridY2[:, i] = gridY1[:-1]
 
 BiasCorr = False
-Gridded = True
+Gridded = False
 nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
 for N in nlist:
@@ -168,15 +168,15 @@ for N in nlist:
         name = 'Grid'
     else:
         name = 'Real'
-    for Type in ['IPA']:
-        for Season in ['2-MAM', '3-JJA', '4-SON']:
+    for Type in ['IPA', 'HL']:
+        for Season in ['1-DJF', '2-MAM', '3-JJA', '4-SON']:
             os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics')
             os.chdir(r'%s\%i' % (Season, 100/N))  # For final analysis
             # os.chdir(r'%s\True' % Season)  # For 'truth' analysis. nlist must be [100/100] only.
             # os.chdir(r'%s\%i\test' % (Season, 100/N))  # For test analysis
 
-            if os.path.isfile('Data\%s_Lsr_%s.npy' % (Type, name)):
-                x = np.load('Data\%s_Lsr_%s.npy' % (Type, name))
+            if os.path.isfile('Data\\%s_Lsr_%s.npy' % (Type, name)):
+                x = np.load('Data\\%s_Lsr_%s.npy' % (Type, name))
                 x[np.where(x == 0)] = np.nan
                 x2 = x[~np.isnan(x)]
 
@@ -186,7 +186,7 @@ for N in nlist:
                 plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(x2, 5), np.percentile(x2, 95)))
                 plt.colorbar()
                 plt.tight_layout()
-                plt.savefig('%s_Lsr_%s.jpg'  % (Type, name))
+                plt.savefig('%s_Lsr_%s.jpg' % (Type, name))
                 plt.close()
 
                 numval = len(x2)
@@ -209,12 +209,13 @@ for N in nlist:
 
                 LimLSR[mask == True] = np.nan
 
-                cgrid2mgrid(LimLSR, Season, 1.2, '%s_Lsr_%s_Model.nc'  % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimLSR, 1.2, '%s_Lsr_%s_Model.nc' % (Type, name), gridX2, gridY2)
                 # if N == 1.00:
-                #     shutil.copyfile('%s_Lsr_Model.nc' % Type, r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_SUITE_V5.3\AS20v28\ratio_%s\others\%s_lsr_sst.nc' % (Season[2:].lower(), Type))
+                #     shutil.copyfile('%s_Lsr_Model.nc' % Type, r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_SUITE_V5.3\
+                #     AS20v28\ratio_%s\others\%s_lsr_sst.nc' % (Season[2:].lower(), Type))
 
-            if os.path.isfile('Data\%s_Sdv_%s.npy'  % (Type, name)):
-                y = np.sqrt(np.load('Data\%s_Sdv_%s.npy'  % (Type, name)))
+            if os.path.isfile('Data\\%s_Sdv_%s.npy' % (Type, name)):
+                y = np.sqrt(np.load('Data\\%s_Sdv_%s.npy' % (Type, name)))
                 y[np.where(y == 0)] = np.nan
                 y2 = y[~np.isnan(y)]
 
@@ -224,7 +225,7 @@ for N in nlist:
                 plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(y2, 5), np.percentile(y2, 95)))
                 plt.colorbar()
                 plt.tight_layout()
-                plt.savefig('%s_Sdv_%s.jpg'  % (Type, name))
+                plt.savefig('%s_Sdv_%s.jpg' % (Type, name))
                 plt.close()
 
                 numval = len(y2)
@@ -247,13 +248,13 @@ for N in nlist:
 
                 LimSTD[mask == True] = np.nan
 
-                cgrid2mgrid(LimSTD, Season, 1.2, '%s_Sdv_%s_Model.nc'  % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimSTD, 1.2, '%s_Sdv_%s_Model.nc' % (Type, name), gridX2, gridY2)
                 # if N == 1.00:
-                #     shutil.copyfile('%s_Sdv_%s_Model.nc'  % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_SUITE_V5.3\
-                #     AS20v28\errorcovs_%s\others\%s_sdv_sst.nc' % (Season[2:].lower(), Type))
+                #     shutil.copyfile('%s_Sdv_%s_Model.nc'  % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_
+                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_sdv_sst.nc' % (Season[2:].lower(), Type))
 
-            if os.path.isfile('Data\%s_Obs_%s.npy'  % (Type, name)):
-                y = np.sqrt(np.load('Data\%s_Obs_%s.npy'  % (Type, name)))
+            if os.path.isfile('Data\\%s_Obs_%s.npy' % (Type, name)):
+                y = np.sqrt(np.load('Data\\%s_Obs_%s.npy' % (Type, name)))
                 y[np.where(y == 0)] = np.nan
                 y2 = y[~np.isnan(y)]
 
@@ -263,7 +264,7 @@ for N in nlist:
                 plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(y2, 5), np.percentile(y2, 95)))
                 plt.colorbar()
                 plt.tight_layout()
-                plt.savefig('%s_Obs_%s.jpg'  % (Type, name))
+                plt.savefig('%s_Obs_%s.jpg' % (Type, name))
                 plt.close()
 
                 numval = len(y2)
@@ -286,7 +287,7 @@ for N in nlist:
 
                 LimSTD[mask == True] = np.nan
 
-                cgrid2mgrid(LimSTD, Season, 1.2, '%s_Obs_%s_Model.nc' % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimSTD, 1.2, '%s_Obs_%s_Model.nc' % (Type, name), gridX2, gridY2)
                 # if N == 1.00:
-                #     shutil.copyfile('%s_Obs_%s_Model.nc' % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_SUITE_V5.3\
-                #     AS20v28\errorcovs_%s\others\%s_obs_sst.nc' % (Season[2:].lower(), Type))
+                #     shutil.copyfile('%s_Obs_%s_Model.nc' % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_
+                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_obs_sst.nc' % (Season[2:].lower(), Type))
