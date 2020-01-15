@@ -112,10 +112,11 @@ xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
 # Gaussian projection length-scale
 a1 = 4
+Typ = 'sst'
 
 Overwrite = False
 
-os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\coarse_grid_sst\2014')
+os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\coarse_grid_%s\2014' % Typ)
 
 # Time variables for diagnostics
 dt = datetime.timedelta(hours=24)
@@ -146,7 +147,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
         exit(0)
 
     dayCount = (End - Start).days
-    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_sst')
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_%s' % Typ)
 
     if Overwrite is True:
         for t in range(dayCount):
@@ -163,7 +164,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     os.chdir('../%s/' % Season)
 
     # Load coarse grid for domain and mask
-    GRID = np.load('coarse_grid_sst.npz')
+    GRID = np.load('coarse_grid_%s.npz' % Typ)
     gridz = GRID['zi']
     gridz = ma.masked_invalid(gridz)
     GRID.close()
@@ -201,14 +202,14 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
                 M2[j, i] = mm[2]
                 M3[j, i] = mm[3]
 
-        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s' % Season)
+        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s/%s/ANI' % (Typ.upper(), Season))
         np.save("M0.npy", np.array(M0))
         np.save("M1.npy", np.array(M1))
         np.save("M2.npy", np.array(M2))
         np.save("M3.npy", np.array(M3))
 
     else:
-        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s' % Season)
+        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s/%s/ANI' % (Typ.upper(), Season))
         M0 = np.load("M0.npy")
         M1 = np.load("M1.npy")
         M2 = np.load("M2.npy")
@@ -232,7 +233,8 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
 
     plt.figure(2)
     plt.pcolormesh(W1, cmap='jet', vmin=0, vmax=1.5)
-    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(W1[~np.isnan(W1)], 5), np.percentile(W1[~np.isnan(W1)], 95)))
+    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(W1[~np.isnan(W1)], 5),
+                                              np.percentile(W1[~np.isnan(W1)], 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('W1.png')
@@ -240,7 +242,8 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
 
     plt.figure(3)
     plt.pcolormesh(V1, cmap='jet', vmin=-0.2, vmax=1.2)
-    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V1[~np.isnan(V1)], 5), np.percentile(V1[~np.isnan(V1)], 95)))
+    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V1[~np.isnan(V1)], 5),
+                                              np.percentile(V1[~np.isnan(V1)], 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('V1.png')
@@ -248,7 +251,8 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
 
     plt.figure(4)
     plt.pcolormesh(V2, cmap='jet', vmin=-2, vmax=2)
-    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V2[~np.isnan(M3)], 5), np.percentile(V2[~np.isnan(V2)], 95)))
+    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V2[~np.isnan(M3)], 5),
+                                              np.percentile(V2[~np.isnan(V2)], 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('V2.png')
@@ -257,10 +261,10 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     TIME[tim] = time.time() - S1
     tim += 1
 if Overwrite is True:
-    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics')
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Typ.upper())
     txt = open('ANI - Analysis.txt', 'w+')
     txt.write('    Time    |    a0    |    a1    |    Season    |    Obs    \n')
     for p2 in range(4):
         txt.write('  %7.2f   |  %5.2f   |  %5.2f   |     %s    |    %i\n' % (
-            TIME[p2], a0, a1, ["1-DJF", "2-MAM", "3-JJA", "4-SON"][p2], size[p2]))
+            TIME[p2], 0.25, a1, ["1-DJF", "2-MAM", "3-JJA", "4-SON"][p2], size[p2]))
     txt.close()

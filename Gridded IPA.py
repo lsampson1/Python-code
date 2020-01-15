@@ -108,7 +108,7 @@ def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
             idd = np.where(~np.isnan(zzi))
             z = zzi[idd]
             d = d[idd]
-            idd = np.sqrt(d * d) < 9
+            idd = d < 9
             z = z[idd]
             d = d[idd]
             t0, t1, e = inner(d, z, v0, i0, i1, e, t0, t1)
@@ -149,6 +149,7 @@ for p in range(0, len(xedges) - 1, 1):
 
 overwrite = True
 a1 = 4
+Typ = 'sst'
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
@@ -179,7 +180,7 @@ for N in nlist:
         S1 = time.time()  # Time diagnostics
 
         os.chdir('%s' % season)
-        GRID = np.load('coarse_grid_sst.npz')
+        GRID = np.load('coarse_grid_%s.npz' % Typ)
         Bias = GRID['zi']
         gridz = ma.masked_invalid(Bias)
         gridindices = np.where(gridz.mask == False)
@@ -189,7 +190,7 @@ for N in nlist:
         # ross = interpolate.griddata((rlon, rlat), np.array(Ross), (x2, y2), 'nearest')
 
         ross = np.load('rossby.npy')
-        ross = ma.masked_array((ross/1000)/(40000/360), gridz.mask)
+        ross = ma.masked_array((ross/1000)/(40000/360), gridz.mask)  # Rossby radius in degrees
         os.chdir('../')
 
         #  Gather information about the number of observations that occur on each day.
@@ -199,7 +200,7 @@ for N in nlist:
         dayIdx = np.zeros(dayCount + 1, np.int64)
         for t in range(dayCount):
             date = Start + t * dt
-            cg = np.load('coarse_grid_sst/%s/%s.npz' % (date.year, date))
+            cg = np.load('coarse_grid_%s/%s/%s.npz' % (Typ, date.year, date))
             dayIdx[t] = InnovationCount
             InnovationCount += int(len(cg['xi'])/N)
         dayIdx[dayCount] = InnovationCount
@@ -222,7 +223,7 @@ for N in nlist:
 
         for t in range(dayCount):
             date = Start + t * dt
-            cg = np.load('coarse_grid_sst/%s/%s.npz' % (date.year, date))
+            cg = np.load('coarse_grid_%s/%s/%s.npz' % (Typ, date.year, date))
             Idx = sorted(random.sample(list(np.arange(len(cg['xi']))), k=int(len(cg['xi'][:])/N)))
             xi, yi, zi = cg['xi'][Idx], cg['yi'][Idx], cg['zi'][Idx, :]
             dataSize = xi.size
@@ -274,7 +275,7 @@ for N in nlist:
         STD[STD == 0] = np.nan
         LSR[LSR == 0] = np.nan
         obs[obs == 0] = np.nan
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % season)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), season))
         if os.path.isdir('%i' % (100/N)) is False:
             os.makedirs('%i' % (100/N))
         np.save(r'%i\Data\IPA_Sdv_Grid.npy' % (100/N), STD)

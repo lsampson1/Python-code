@@ -8,8 +8,20 @@ import scipy.interpolate as interpolate
 from netCDF4 import Dataset
 
 
-def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2):
+def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2, typ):
 
+    if typ == 'sst':
+        label = 'Temperature'
+        ll = 0.2
+        ul = 0.8
+    elif typ == 'sla':
+        label = 'Sea level anomoly'
+        ll = 0
+        ul = 0.3
+    else:
+        label = 'False'
+        ll = 0
+        ul = 1
     cwdi = os.getcwd()
     os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
 
@@ -41,11 +53,11 @@ def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2):
         nnz = griddz[~np.isnan(griddz)]
 
         plt.figure()
-        plt.title('Error standard deviation')
-        plt.pcolormesh(griddz, cmap='jet', vmin=0.2, vmax=0.8)
+        plt.title('Background error standard deviation')
+        plt.pcolormesh(griddz, cmap='jet', vmin=ll, vmax=ul)
         plt.colorbar()
         plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(nnz, 5), np.percentile(nnz, 95)))
-        plt.ylabel('Temperature')
+        plt.ylabel(label)
         plt.tight_layout()
         plt.savefig('%s.png' % (dst[:-3]))
         plt.close()
@@ -66,11 +78,11 @@ def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2):
         nnz = griddz[~np.isnan(griddz)]
 
         plt.figure()
-        plt.title('Error standard deviation')
-        plt.pcolormesh(griddz, cmap='jet', vmin=0, vmax=.5)
+        plt.title('Observation error standard deviation')
+        plt.pcolormesh(griddz, cmap='jet', vmin=0, vmax=0.5)
         plt.colorbar()
         plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(nnz, 5), np.percentile(nnz, 95)))
-        plt.ylabel('Temperature')
+        plt.ylabel(label)
         plt.tight_layout()
         plt.savefig('%s.png' % (dst[:-3]))
         plt.close()
@@ -98,7 +110,7 @@ def cgrid2mgrid(variable, sigma, dst, gridx2, gridy2):
         plt.pcolormesh(griddz, cmap='jet', vmin=0, vmax=1)
         plt.colorbar()
         plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(nnz, 5), np.percentile(nnz, 95)))
-        plt.ylabel('Temperature')
+        plt.ylabel(label)
         plt.tight_layout()
         plt.savefig('%s.png' % (dst[:-3]))
         plt.close()
@@ -141,9 +153,19 @@ def smooth_var_array(data, sigma):
 
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\1-DJF')
+Typ = 'sst'
+if Typ == 'sst':
+    ll = 0.2
+    ul = 0.8
+elif Typ == 'sla':
+    ll = 0
+    ul = 0.3
+else:
+    ll = 0
+    ul = 1
 
 # Load coarse grid for domain and mask
-GRID = np.load('coarse_grid_sst.npz')
+GRID = np.load('coarse_grid_%s.npz' % Typ)
 gridX1 = GRID['xi']
 gridY1 = GRID['yi']
 gridZ1 = GRID['zi']
@@ -160,19 +182,19 @@ for i in range(0, len(gridX1) - 1, 1):
     gridY2[:, i] = gridY1[:-1]
 
 BiasCorr = False
-Gridded = False
-nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+Gridded = True
+nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
 for N in nlist:
     if Gridded:
         name = 'Grid'
     else:
         name = 'Real'
-    for Type in ['IPA', 'HL']:
+    for Type in ['HL']:
         for Season in ['1-DJF', '2-MAM', '3-JJA', '4-SON']:
-            os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics')
-            os.chdir(r'%s\%i' % (Season, 100/N))  # For final analysis
-            # os.chdir(r'%s\True' % Season)  # For 'truth' analysis. nlist must be [100/100] only.
+            os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Typ.upper())
+            # os.chdir(r'%s\%i' % (Season, 100/N))  # For final analysis
+            os.chdir(r'%s\True' % Season)  # For 'truth' analysis. nlist must be [100/100] only.
             # os.chdir(r'%s\%i\test' % (Season, 100/N))  # For test analysis
 
             if os.path.isfile('Data\\%s_Lsr_%s.npy' % (Type, name)):
@@ -209,10 +231,10 @@ for N in nlist:
 
                 LimLSR[mask == True] = np.nan
 
-                cgrid2mgrid(LimLSR, 1.2, '%s_Lsr_%s_Model.nc' % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimLSR, 1.2, '%s_Lsr_%s_Model.nc' % (Type, name), gridX2, gridY2, Typ)
                 # if N == 1.00:
                 #     shutil.copyfile('%s_Lsr_Model.nc' % Type, r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_SUITE_V5.3\
-                #     AS20v28\ratio_%s\others\%s_lsr_sst.nc' % (Season[2:].lower(), Type))
+                #     AS20v28\ratio_%s\others\%s_lsr_%s.nc' % (Season[2:].lower(), Type, Typ))
 
             if os.path.isfile('Data\\%s_Sdv_%s.npy' % (Type, name)):
                 y = np.sqrt(np.load('Data\\%s_Sdv_%s.npy' % (Type, name)))
@@ -220,7 +242,7 @@ for N in nlist:
                 y2 = y[~np.isnan(y)]
 
                 plt.figure()
-                plt.pcolormesh(gridX1, gridY1, y, cmap='jet', vmin=0.2, vmax=0.8)
+                plt.pcolormesh(gridX1, gridY1, y, cmap='jet', vmin=ll, vmax=ul)
                 plt.title('Temperature (degrees)')
                 plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(y2, 5), np.percentile(y2, 95)))
                 plt.colorbar()
@@ -248,10 +270,10 @@ for N in nlist:
 
                 LimSTD[mask == True] = np.nan
 
-                cgrid2mgrid(LimSTD, 1.2, '%s_Sdv_%s_Model.nc' % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimSTD, 1.2, '%s_Sdv_%s_Model.nc' % (Type, name), gridX2, gridY2, Typ)
                 # if N == 1.00:
                 #     shutil.copyfile('%s_Sdv_%s_Model.nc'  % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_
-                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_sdv_sst.nc' % (Season[2:].lower(), Type))
+                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_sdv_%s.nc' % (Season[2:].lower(), Type, Typ))
 
             if os.path.isfile('Data\\%s_Obs_%s.npy' % (Type, name)):
                 y = np.sqrt(np.load('Data\\%s_Obs_%s.npy' % (Type, name)))
@@ -287,7 +309,7 @@ for N in nlist:
 
                 LimSTD[mask == True] = np.nan
 
-                cgrid2mgrid(LimSTD, 1.2, '%s_Obs_%s_Model.nc' % (Type, name), gridX2, gridY2)
+                cgrid2mgrid(LimSTD, 1.2, '%s_Obs_%s_Model.nc' % (Type, name), gridX2, gridY2, Typ)
                 # if N == 1.00:
                 #     shutil.copyfile('%s_Obs_%s_Model.nc' % (Type, name), r'\\POFCDisk1\PhD_Lewis\ocean\OPERATIONAL_
-                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_obs_sst.nc' % (Season[2:].lower(), Type))
+                #     SUITE_V5.3\AS20v28\errorcovs_%s\others\%s_obs_%s.nc' % (Season[2:].lower(), Type, Typ))

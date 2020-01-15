@@ -98,6 +98,7 @@ xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
 Overwrite = True
 a1 = 4  # Long length-scale, in degrees.
+Typ = 'sla'
 
 #  Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-conv
 #  ert-kilometres-to-degrees-in-geodjango-geos
@@ -105,7 +106,7 @@ a1 = 4  # Long length-scale, in degrees.
 size = []
 TIME = []
 dt = datetime.timedelta(hours=24)
-nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 for N in nlist:  # Use every Nth observation. (N=1 is every observation)
     for Season in Seasonlist:
         S1 = time.time()
@@ -131,7 +132,7 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
             exit(0)
 
         dayCount = (End - Start).days
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_sst')
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_%s' % Typ)
 
         random.seed(100)
         ze = []
@@ -151,7 +152,7 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
         os.chdir('../%s/' % Season)
 
         # Load coarse grid for domain and mask
-        GRID = np.load('coarse_grid_sst.npz')
+        GRID = np.load('coarse_grid_%s.npz' % Typ)
         gridz = GRID['zi']
         gridz = ma.masked_invalid(gridz)
         GRID.close()
@@ -199,9 +200,9 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
 
         print(time.time()-S1)
         TIME.append(time.time()-S1)
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Season)
-        if os.path.isdir('%i' % (100/N)) is False:
-            os.makedirs('%i' % (100/N))
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), Season))
+        if os.path.isdir('%i/Data' % (100/N)) is False:
+            os.makedirs('%i/Data' % (100/N))
         np.save(r"%i\Data\IPA_Sdv_Real.npy" % (100/N), STD)
         np.save(r"%i\Data\IPA_Obs_Real.npy" % (100/N), obs)
         np.save(r"%i\Data\IPA_Lsr_Real.npy" % (100/N), LSR)
