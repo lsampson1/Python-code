@@ -44,7 +44,7 @@ def distance(la1, lo1, lat2, lon2):
     angle2 = 2.0*arcsin(sqrt(a))
     angle2 = degrees(angle2)
 
-    return angle2
+    return angle2*(40000/360)
 
 
 @jit('f8[:,:,:](i8, i8[:], i8[:], i8[:], f8[:], f8[:,:])', forceobj=True)
@@ -88,7 +88,7 @@ def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
 
     for laidx2, lat2 in enumerate(lat):
         for loidx2, lon2 in enumerate(lon):
-            if d[laidx2, loidx2] <= 900000:
+            if d[laidx2, loidx2] <= 900:
                 v1 = allgriddedvalues[laidx1, loidx1, :]
                 v2 = allgriddedvalues[laidx2, loidx2, :]
                 if np.isnan(v1*v2).all():
@@ -132,10 +132,11 @@ for p in range(0, len(xedges) - 1, 1):
 # Ross = ross[np.where(ross <= 200000)]
 
 overwrite = True
-Dx = 30000  # Bin size in metres.
+Dx = 30  # Bin size in metres.
+Typ = 'sst'
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
-nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 dt = datetime.timedelta(hours=24)  # Time Step.
 TIME = []
 size = []
@@ -163,7 +164,7 @@ for N in nlist:
         S1 = time.time()  # Time diagnostics
 
         os.chdir('%s' % season)
-        GRID = np.load('coarse_grid_sst.npz')
+        GRID = np.load('coarse_grid_%s.npz' % Typ)
         Bias = GRID['zi']
         gridz = ma.masked_invalid(Bias)
         gridindices = np.where(gridz.mask == False)
@@ -173,7 +174,7 @@ for N in nlist:
         # ross = interpolate.griddata((rlon, rlat), np.array(Ross), (x2, y2), 'nearest')
 
         ross = np.load('rossby.npy')
-        ross = ma.masked_array(ross, gridz.mask)
+        ross = ma.masked_array(ross/1000, gridz.mask)
         os.chdir('../')
 
         #  Gather information about the number of observations that occur on each day.
@@ -183,7 +184,7 @@ for N in nlist:
         dayIdx = np.zeros(dayCount + 1, np.int64)
         for t in range(dayCount):
             date = Start + t * dt
-            cg = np.load('coarse_grid_sst/%s/%s.npz' % (date.year, date))
+            cg = np.load('coarse_grid_%s/%s/%s.npz' % (Typ, date.year, date))
             dayIdx[t] = InnovationCount
             InnovationCount += int(len(cg['xi'])/N)
         dayIdx[dayCount] = InnovationCount
@@ -206,7 +207,7 @@ for N in nlist:
 
         for t in range(dayCount):
             date = Start + t * dt
-            cg = np.load('coarse_grid_sst/%s/%s.npz' % (date.year, date))
+            cg = np.load('coarse_grid_%s/%s/%s.npz' % (Typ, date.year, date))
             Idx = sorted(random.sample(list(np.arange(len(cg['xi']))), k=int(len(cg['xi'][:])/N)))
             xi, yi, zi = cg['xi'][Idx], cg['yi'][Idx], cg['zi'][Idx, :]
             dataSize = xi.size
@@ -244,7 +245,7 @@ for N in nlist:
                     validIdx[0] = False
                     try:
                         def func(xx, xa, xb):  # The function is created anew, as it is dependent on the Rossby radius.
-                            return xa*np.exp(-(xx**2)/(2*ross[i, j]**2)) + xb*np.exp(-(xx**2)/(2*(444*1000)**2))
+                            return xa*np.exp(-(xx**2)/(2*ross[i, j]**2)) + xb*np.exp(-(xx**2)/(2*444**2))
                         #  Apply the curve fitting, the function is from scipy.curve_fit.
                         popt, pcov = curve_fit(func, dist[validIdx], cov[validIdx], maxfev=100000000)
                         STD[i, j] = popt[0]+popt[1]
@@ -261,7 +262,7 @@ for N in nlist:
         STD[STD == 0] = np.nan
         LSR[LSR == 0] = np.nan
         obs[obs == 0] = np.nan
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % season)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), season))
         if os.path.isdir('%i' % (100/N)) is False:
             os.makedirs('%i' % (100/N))
         np.save(r'%i\Data\HL_Sdv_Grid.npy' % (100/N), STD)
