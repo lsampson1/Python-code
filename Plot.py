@@ -182,8 +182,8 @@ for i in range(0, len(gridX1) - 1, 1):
     gridY2[:, i] = gridY1[:-1]
 
 BiasCorr = False
-Gridded = True
-nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+Gridded = False
+nlist = [100/50]#, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
 for N in nlist:
     if Gridded:
@@ -191,11 +191,11 @@ for N in nlist:
     else:
         name = 'Real'
     for Type in ['HL']:
-        for Season in ['1-DJF', '2-MAM', '3-JJA', '4-SON']:
+        for Season in ['3-JJA']:
             os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Typ.upper())
             # os.chdir(r'%s\%i' % (Season, 100/N))  # For final analysis
-            os.chdir(r'%s\True' % Season)  # For 'truth' analysis. nlist must be [100/100] only.
-            # os.chdir(r'%s\%i\test' % (Season, 100/N))  # For test analysis
+            # os.chdir(r'%s\True' % Season)  # For 'truth' analysis. nlist must be [100/100] only.
+            os.chdir(r'%s\%i\test' % (Season, 100/N))  # For test analysis
 
             if os.path.isfile('Data\\%s_Lsr_%s.npy' % (Type, name)):
                 x = np.load('Data\\%s_Lsr_%s.npy' % (Type, name))
@@ -243,7 +243,7 @@ for N in nlist:
 
                 plt.figure()
                 plt.pcolormesh(gridX1, gridY1, y, cmap='jet', vmin=ll, vmax=ul)
-                plt.title('Temperature (degrees)')
+                plt.title('Temperature (celsius)')
                 plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(y2, 5), np.percentile(y2, 95)))
                 plt.colorbar()
                 plt.tight_layout()

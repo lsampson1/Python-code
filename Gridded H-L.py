@@ -18,33 +18,23 @@ from numba import jit, njit
 #  coarse_grid_sst.npz (for the chosen seasons), and a rossby radius .npy file
 #
 ########################################################################################################################
+KM2D = 40000/360
+MaxRadius = 900/KM2D
 
 
 @njit('f8[:,:](f8, f8, f8[:], f8[:])', parallel=True, fastmath=True)
 def distance(la1, lo1, lat2, lon2):
-    # Computes the Haversine distance between two points.
 
     lon1 = np.zeros((len(lon2), len(lat2)))
     for pr in range(0, len(lat2), 1):
-        lon1[:, pr] = lon2[:]
+        lon1[:, pr] = lon2[:]-lo1
     lon1 = np.transpose(lon1)
 
     lat1 = np.zeros((len(lat2), len(lon2)))
     for pr in range(0, len(lon2), 1):
-        lat1[:, pr] = lat2[:]
+        lat1[:, pr] = lat2[:]-la1
 
-    radians, sin, cos, arcsin, sqrt, degrees = np.radians, np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
-
-    x0 = radians(lo1)
-    y0 = radians(la1)
-    xr = radians(lon1)
-    yr = radians(lat1)
-
-    a = sin((yr - y0)/2.0)**2.0 + (cos(y0)*cos(yr)*(sin((xr - x0)/2.0)**2.0))
-    angle2 = 2.0*arcsin(sqrt(a))
-    angle2 = degrees(angle2)
-
-    return angle2*(40000/360)
+    return np.sqrt(lat1*lat1+lon1*lon1)
 
 
 @jit('f8[:,:,:](i8, i8[:], i8[:], i8[:], f8[:], f8[:,:])', forceobj=True)
@@ -64,8 +54,7 @@ def griddata(daycount, dayidx, latidx, lonidx, sst, gridmean):
             allgriddedvalues[laidx2, loidx2, day] += sst[k]
             valcount[laidx2, loidx2] += 1
         valcount2 = valcount.copy()
-        idx = (valcount2 == 0)
-        valcount2[idx] = 1.00
+        valcount2[valcount2 == 0] = 1.00
         allgriddedvalues[:, :, day] = allgriddedvalues[:, :, day]/valcount2
         allgriddedvalues[:, :, day][np.isnan(gridmean)] = np.nan
         allgriddedvalues[valcount == 0, day] = np.nan
@@ -75,7 +64,6 @@ def griddata(daycount, dayidx, latidx, lonidx, sst, gridmean):
 
 @jit('Tuple((f8[:],f8[:]))(f8, i8, i8, f8[:,:,:], f8[:], f8[:], f8[:,:])', forceobj=True)
 def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
-
     fitcorr = np.zeros(31)
     fitcorrcount = np.zeros(31)
 
@@ -85,10 +73,9 @@ def fit(dd, laidx1, loidx1, allgriddedvalues, lat, lon, fitvar):
         return fitcorr, fitcorr
 
     d = distance(la1, lo1, lat, lon)
-
     for laidx2, lat2 in enumerate(lat):
         for loidx2, lon2 in enumerate(lon):
-            if d[laidx2, loidx2] <= 900:
+            if d[laidx2, loidx2] <= np.radians(MaxRadius):
                 v1 = allgriddedvalues[laidx1, loidx1, :]
                 v2 = allgriddedvalues[laidx2, loidx2, :]
                 if np.isnan(v1*v2).all():
@@ -111,6 +98,8 @@ xedges = np.linspace(45, 75, int(stepx))
 ycenter = 0.5 * (yedges[1:] + yedges[:-1])
 xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
+a1 = np.radians(4)
+
 x2 = np.zeros((len(xedges) - 1, len(yedges) - 1))
 for p in range(0, len(yedges) - 1, 1):
     x2[:, p] = xedges[:-1]
@@ -120,23 +109,12 @@ y2 = np.zeros((len(yedges) - 1, len(xedges) - 1))
 for p in range(0, len(xedges) - 1, 1):
     y2[:, p] = yedges[:-1]
 
-#  Loading the Rossby radius of deformation, to assign the shorter length-scale.
-# os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
-# R = Dataset('rossby_radii.nc', 'r')
-# ross = np.array(R.variables['rossby_r'][:])
-# rlat = np.array(R.variables['lat'][:])
-# rlon = np.array(R.variables['lon'][:])
-# R.close()
-# rlat = rlat[np.where(np.array(ross) <= 200000)]
-# rlon = rlon[np.where(np.array(ross) <= 200000)]
-# Ross = ross[np.where(ross <= 200000)]
-
 overwrite = True
-Dx = 30  # Bin size in metres.
+Dx = np.radians(30/KM2D)  # Bin size in metres.
 Typ = 'sst'
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
-nlist = [100/100]  # , 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 dt = datetime.timedelta(hours=24)  # Time Step.
 TIME = []
 size = []
@@ -174,7 +152,7 @@ for N in nlist:
         # ross = interpolate.griddata((rlon, rlat), np.array(Ross), (x2, y2), 'nearest')
 
         ross = np.load('rossby.npy')
-        ross = ma.masked_array(ross/1000, gridz.mask)
+        ross = ma.masked_array(np.radians((ross/1000)/KM2D), gridz.mask)
         os.chdir('../')
 
         #  Gather information about the number of observations that occur on each day.
@@ -237,17 +215,17 @@ for N in nlist:
                 if gridz.mask[i,j] == True:
                     continue
                 S2 = time.time()
-
+                a0 = ross[i, j]
                 #  fit is the binning process, allGriddedValues is turned into a covariance array with 30 bins of 30km.
-                (cov, dist) = fit(Dx, i, j, allGriddedValues, ycenter, xcenter, Bias**2)
+                (cov, dist) = fit(Dx, i, j, allGriddedValues, np.radians(ycenter), np.radians(xcenter), Bias**2)
                 if (cov != 0.0).any():
                     validIdx = np.logical_not(np.isnan(cov))
                     validIdx[0] = False
                     try:
                         def func(xx, xa, xb):  # The function is created anew, as it is dependent on the Rossby radius.
-                            return xa*np.exp(-(xx**2)/(2*ross[i, j]**2)) + xb*np.exp(-(xx**2)/(2*444**2))
-                        #  Apply the curve fitting, the function is from scipy.curve_fit.
-                        popt, pcov = curve_fit(func, dist[validIdx], cov[validIdx], maxfev=100000000)
+                            return xa*np.exp(-(xx**2)/(2*a0**2)) + xb*np.exp(-(xx**2)/(2*a1**2))
+                        #  Apply the curve fitting, the function is from scipy.optimize.
+                        popt, pcov = curve_fit(func, dist[validIdx], cov[validIdx], maxfev=1000)
                         STD[i, j] = popt[0]+popt[1]
                         obs[i, j] = cov[0] - (popt[0]+popt[1])
                         LSR[i, j] = popt[0]/(popt[0]+popt[1])

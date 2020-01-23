@@ -114,7 +114,7 @@ xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 a1 = 4
 Typ = 'sst'
 
-Overwrite = False
+Overwrite = True
 
 os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\coarse_grid_%s\2014' % Typ)
 
@@ -192,7 +192,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
                     yi.append(Yi[t][idi])
                     zi.append(Zi[t][idi])
 
-                T, E = time_loop(Xi, Yi, Zi, x, y, a0, a1, dayCount)
+                T, E = time_loop(xi, yi, zi, x, y, a0, a1, dayCount)
 
                 M = np.asmatrix(E).I
 

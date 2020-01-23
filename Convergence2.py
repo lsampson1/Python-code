@@ -50,6 +50,7 @@ m = 0
 ls = ['-', '--', ':']
 cs = ['deepskyblue', 'forestgreen', 'gold', 'sandybrown']
 namelist = [('IPA', 'real'), ('IPA', 'grid'), ('HL', 'grid')]
+Typ = 'sst'
 
 for name in namelist:
     str1 = 'Data\\%s_Sdv_%s.npy' % (name[0], name[1])
@@ -76,7 +77,7 @@ for name in namelist:
             y1[:, i] = y2[:-1]
         points = np.array((x1.flatten(), y1.flatten()))
 
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Season)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), Season))
         TRUSDV = np.load(r"True\%s" % str1)
         TRULSR = np.load(r"True\%s" % str2)
 
@@ -84,7 +85,7 @@ for name in namelist:
         TRULSR = inter(TRULSR, points)
 
         for N in nlist:  # Use every Nth observation. (N=1 is every observation)
-            os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%i' % (Season, 100 / N))
+            os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s\%i' % (Typ, Season, 100 / N))
             if os.path.isfile('%s' % str1) is False:
                 continue
             else:
