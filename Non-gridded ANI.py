@@ -4,99 +4,94 @@ import datetime
 import numpy.ma as ma
 import time
 import matplotlib.pyplot as plt
-from numba import jit, njit
+from numba import jit
+
+KM2D = 40000/360
+MaxRadius = 900/KM2D
 
 
-@njit('(f8[:])(f8[:], f8[:], f8, f8)', parallel=True, fastmath=True)
-def distance(la1, lo1, lat2, lon2):
-    # Computes the Haversine distance between two points.
-
-    radians, sin, cos, arcsin, sqrt, degrees = np.radians, np.sin, np.cos, np.arcsin, np.sqrt, np.degrees
-
-    x0 = radians(lo1)
-    y0 = radians(la1)
-    xr = radians(lon2)
-    yr = radians(lat2)
-
-    a = sin((yr - y0)/2.0)**2.0 + (cos(y0)*cos(yr)*(sin((xr - x0)/2.0)**2.0))
-    angle2 = 2.0*arcsin(sqrt(a))
-    angle2 = degrees(angle2)
-
-    return angle2
-
-
-@jit('Tuple((f8, f8[:,:]))(f8[:], f8[:], f4[:], f8, f8, f4, i8, i8)', forceobj=True)
-def time_loop(xti, yti, zti, xx, yy, i0, i1, daycount):
+@jit('Tuple((f8, f8[:,:]))(f8[:], f8[:], f4[:], f8, f8, i8)',
+     nopython=True, parallel=True, forceobj=True)
+def time_loop(xti, yti, zti, i0, i1, daycount):
     tot = np.zeros(4)
     e = np.zeros((4, 4))
-    degrees, sqrt, cos, sin, radians, arcsin, argmin = \
-        np.degrees, np.sqrt, np.cos, np.sin, np.radians, np.arcsin, np.argmin
     for tt in range(0, daycount):
         # Set array of 'today's' innovations
+
         xxi = xti[tt]
         yyi = yti[tt]
         zzi = zti[tt]
-        if len(zzi) <= 10:
+        if len(zzi) <= 1:
             continue
-        rmin = argmin(distance(yyi, xxi, yy, xx))
-        xxi = (degrees(2 * arcsin(sqrt(cos(radians(yyi))*cos(radians(yy)) * sin((radians(xxi - xx) / 2))**2))))**2
-        yyi = (yyi - yy)**2  # Positive and negative, not absolute because squared later.
-        v0 = zzi[rmin]
-        tot, e = inner(xxi, yyi, zzi, v0, tot, e, i0, i1)
+
+        xx2 = xxi*xxi
+        yy2 = yyi*yyi
+
+        v0idx = np.argmin(xx2 + yy2)
+        tot, e = inner(xx2, yy2, zzi, v0idx, tot, e, i0, i1)
     return tot, e
 
 
-@njit('Tuple((f8[:], f8[:,:]))(f8[:], f8[:], f4[:], f4, f8[:], f8[:,:], f8, i8)', parallel=True, fastmath=True)
-def inner(xxi, yyi, zzi, v0, tot, e, i0, i1):
+@jit('Tuple((f8[:], f8[:,:]))(f8[:], f8[:], f4[:], f8, f8[:], f8[:,:], f8, f8)',
+     nopython=True, parallel=True, fastmath=True)
+def inner(xx2, yy2, zzi, v0idx, tot, e, i0, i1):
 
     exp, summ = np.exp, np.sum
 
-    idx = (xxi + yyi) < 81
+    idd = (xx2 + yy2) < MaxRadius*MaxRadius  # First filter of points that are, at least, MaxRadius away from the centre
+    idd[v0idx] = False  # Removes the element that corresponds to v0 because the observation correlation is not zero.
 
-    xxi = xxi[idx]
-    yyi = yyi[idx]
-    z = zzi[idx]
+    xx2 = xx2[idd]
+    yy2 = yy2[idd]
+    z   = zzi[idd]
 
-    idx = (z != v0)
+    il0 = 1.0/(2*i0*i0)
+    il1 = 1.0/(2*i1*i1)
 
-    xxi = xxi[idx]
-    yyi = yyi[idx]
-    z = z[idx]
+    expx0 = exp(-xx2*il0)
+    expy0 = exp(-yy2*il0)
+    expx1 = exp(-xx2*il1)
+    expy1 = exp(-yy2*il1)
+    yaa = expx0*expy0
+    yab = expx0*expy1
+    yba = expx1*expy0
+    ybb = expx1*expy1
 
-    yaa = exp(-xxi / (2 * i0 ** 2)) * exp(-yyi / (2 * i0 ** 2))
-    yab = exp(-xxi / (2 * i0 ** 2)) * exp(-yyi / (2 * i1 ** 2))
-    yba = exp(-xxi / (2 * i1 ** 2)) * exp(-yyi / (2 * i0 ** 2))
-    ybb = exp(-xxi / (2 * i1 ** 2)) * exp(-yyi / (2 * i1 ** 2))
+    v0 = zzi[v0idx]
+    tot[0] += v0*summ(yaa * z)
+    tot[1] += v0*summ(ybb * z)
+    tot[2] += v0*summ(yab * z)
+    tot[3] += v0*summ(yba * z)
 
-    ia0 = summ(yaa * z * v0)
-    ia1 = summ(ybb * z * v0)
-    ia2 = summ(yab * z * v0)
-    ia3 = summ(yba * z * v0)
+    e00 = summ(yaa*yaa)
+    e10 = summ(yaa*ybb)
+    e20 = summ(yaa*yab)
+    e30 = summ(yaa*yba)
+    e[0, 0] += e00
+    e[1, 0] += e10
+    e[0, 1] += e10
+    e[2, 0] += e20
+    e[0, 2] += e20
+    e[3, 0] += e30
+    e[0, 3] += e30
 
-    e[0, 0] += summ(yaa * yaa)
-    e[1, 0] += summ(yaa * ybb)
-    e[0, 1] += summ(yaa * ybb)
-    e[2, 0] += summ(yaa * yab)
-    e[0, 2] += summ(yaa * yab)
-    e[3, 0] += summ(yaa * yba)
-    e[0, 3] += summ(yaa * yba)
+    e11 = summ(ybb*ybb)
+    e12 = summ(ybb*yab)
+    e13 = summ(ybb*yba)
+    e[1, 1] += e11
+    e[1, 2] += e12
+    e[2, 1] += e12
+    e[1, 3] += e13
+    e[3, 1] += e13
 
-    e[1, 1] += summ(ybb * ybb)
-    e[1, 2] += summ(ybb * yab)
-    e[2, 1] += summ(ybb * yab)
-    e[1, 3] += summ(ybb * yba)
-    e[3, 1] += summ(ybb * yba)
+    e22 = summ(yab*yab)
+    e23 = summ(yab*yba)
+    e[2, 2] += e22
+    e[2, 3] += e23
+    e[3, 2] += e23
 
-    e[2, 2] += summ(yab * yab)
-    e[2, 3] += summ(yab * yba)
-    e[3, 2] += summ(yab * yba)
-
-    e[3, 3] += summ(yba * yba)
-
-    tot[0] += ia0
-    tot[1] += ia1
-    tot[2] += ia2
-    tot[3] += ia3
+    e33 = summ(yba*yba)
+    e[3, 3] += e33
 
     return tot, e
 
@@ -111,19 +106,17 @@ ycenter = 0.5 * (yedges[1:] + yedges[:-1])
 xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
 # Gaussian projection length-scale
-a1 = 4
+a1 = 4.0
 Typ = 'sst'
-
-Overwrite = False
-
-os.chdir(r'\\POFCDisk1\PhD_Lewis\H-L_Variances\Innovations\coarse_grid_%s\2014' % Typ)
+Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
+Overwrite = True
 
 # Time variables for diagnostics
 dt = datetime.timedelta(hours=24)
 TIME = np.zeros(4)
 tim = 0
 size = np.zeros(4)
-for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
+for Season in Seasonlist:
     Zi = []
     Yi = []
     Xi = []
@@ -147,7 +140,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
         exit(0)
 
     dayCount = (End - Start).days
-    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_%s' % Typ)
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\Preprocessed\Innovations_%s' % Typ)
 
     if Overwrite is True:
         for t in range(dayCount):
@@ -170,53 +163,69 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     GRID.close()
 
     ross = np.load('rossby.npy')
-    ross = ma.masked_array((ross / 1000) / (40000 / 360), gridz.mask)
+    ross = ma.masked_array((ross / 1000) / KM2D, gridz.mask)
 
     M0, M1, M2, M3 = np.zeros_like(gridz), np.zeros_like(gridz), np.zeros_like(gridz), np.zeros_like(gridz)
 
     if Overwrite is True:
-        for i, x in enumerate(xcenter):
-            for j, y in enumerate(ycenter):
-                if gridz.mask[j, i] == True:
-                    continue
-                S2 = time.time()
+        for i, y in enumerate(ycenter):
 
-                a0 = ross[j, i]
+            print(i, time.time() - S1)
+
+            xiY = []
+            yiY = []
+            ziY = []
+            # First filters the innovations in the range x-MaxRadius..x+MaxRadius
+            for t in range(dayCount):
+                idx = (abs(Yi[t] - y) <= MaxRadius)
+                xiY.append(Xi[t][idx])
+                yiY.append(Yi[t][idx])
+                ziY.append(Zi[t][idx])
+
+            for j, x in enumerate(xcenter):
+                if gridz.mask[i, j] == True:
+                    continue
+
+                # Secondly filters the innovations in the range y-MaxRadius..y+MaxRadius
                 xi = []
                 yi = []
                 zi = []
+                for t in range(dayCount):
+                    idx = abs(xiY[t] - x) <= MaxRadius
+                    xi.append(xiY[t][idx] - x)
+                    yi.append(yiY[t][idx] - y)
+                    zi.append(ziY[t][idx])
 
-                for t in range(0, dayCount):  # 'Box Cut', removes all values more than 9 degrees in x or y.
-                    idi = np.logical_and(abs(Xi[t] - x) <= 9, abs(Yi[t] - y) <= 9)
-                    xi.append(Xi[t][idi])
-                    yi.append(Yi[t][idi])
-                    zi.append(Zi[t][idi])
+                S2 = time.time()
 
-                T, E = time_loop(Xi, Yi, Zi, x, y, a0, a1, dayCount)
+                a0 = ross[i, j]
 
-                M = np.asmatrix(E).I
+                T, E = time_loop(xi, yi, zi, a0, a1, dayCount)
 
-                mm = M * np.asmatrix(T).T
-                M0[j, i] = mm[0]
-                M1[j, i] = mm[1]
-                M2[j, i] = mm[2]
-                M3[j, i] = mm[3]
+                mm = np.linalg.solve(E, np.asmatrix(T).T)
 
-        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s/%s/ANI' % (Typ.upper(), Season))
+                M0[i, j] = mm[0]
+                M1[i, j] = mm[1]
+                M2[i, j] = mm[2]
+                M3[i, j] = mm[3]
+
+        os.chdir('//POFCDisk1/PhD_Lewis/ErrorEstimation/%s/%s/ANI' % (Typ.upper(), Season))
         np.save("M0.npy", np.array(M0))
         np.save("M1.npy", np.array(M1))
         np.save("M2.npy", np.array(M2))
         np.save("M3.npy", np.array(M3))
+        TIME[tim] = time.time() - S1
+        tim += 1
 
-    else:
-        os.chdir('//POFCDisk1/PhD_Lewis/EEDiagnostics/%s/%s/ANI' % (Typ.upper(), Season))
-        M0 = np.load("M0.npy")
-        M1 = np.load("M1.npy")
-        M2 = np.load("M2.npy")
-        M3 = np.load("M3.npy")
+for Season in Seasonlist:
+    os.chdir('//POFCDisk1/PhD_Lewis/ErrorEstimation/%s/%s/ANI' % (Typ.upper(), Season))
+    M0 = np.load("M0.npy")
+    M1 = np.load("M1.npy")
+    M2 = np.load("M2.npy")
+    M3 = np.load("M3.npy")
 
-        for M in [M0, M1, M2, M3]:
-            M[M == 0] = np.nan
+    for M in [M0, M1, M2, M3]:
+        M[M == 0] = np.nan
 
     V = M0 + M1 + M2 + M3
     W1 = (M0 + M1)/V
@@ -232,7 +241,7 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     plt.close()
 
     plt.figure(2)
-    plt.pcolormesh(W1, cmap='jet', vmin=0, vmax=1.5)
+    plt.pcolormesh(W1, cmap='jet', vmin=0, vmax=1.0)
     plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(W1[~np.isnan(W1)], 5),
                                               np.percentile(W1[~np.isnan(W1)], 95)))
     plt.colorbar()
@@ -241,9 +250,9 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
     plt.close()
 
     plt.figure(3)
-    plt.pcolormesh(V1, cmap='jet', vmin=-0.2, vmax=1.2)
+    plt.pcolormesh(V1, cmap='jet', vmin=0, vmax=1.0)
     plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V1[~np.isnan(V1)], 5),
-                                              np.percentile(V1[~np.isnan(V1)], 95)))
+                                           np.percentile(V1[~np.isnan(V1)], 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('V1.png')
@@ -251,17 +260,15 @@ for Season in ["1-DJF", "2-MAM", "3-JJA", "4-SON"]:
 
     plt.figure(4)
     plt.pcolormesh(V2, cmap='jet', vmin=-2, vmax=2)
-    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V2[~np.isnan(M3)], 5),
+    plt.xlabel('5%% = %3.5f, 95%% = %3.5f' % (np.percentile(V2[~np.isnan(V2)], 5),
                                               np.percentile(V2[~np.isnan(V2)], 95)))
     plt.colorbar()
     plt.tight_layout()
     plt.savefig('V2.png')
     plt.close()
 
-    TIME[tim] = time.time() - S1
-    tim += 1
 if Overwrite is True:
-    os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Typ.upper())
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\%s' % Typ.upper())
     txt = open('ANI - Analysis.txt', 'w+')
     txt.write('    Time    |    a0    |    a1    |    Season    |    Obs    \n')
     for p2 in range(4):

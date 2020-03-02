@@ -22,9 +22,10 @@ np.seterr(all='ignore')
 # Gaussian projection length-scale
 a0 = 0.25
 a1 = 4
+p = 0
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]
-Gridded = True
+Gridded = False
 
 if Gridded:
     ipa_str1 = 'Data\\IPA_Sdv_Grid.npy'
@@ -33,132 +34,141 @@ if Gridded:
     hl_str2 = 'Data\\HL_Lsr_Grid.npy'
 else:
     ipa_str1 = 'Data\\IPA_Sdv_Real.npy'
-    hl_str1 = 'Data\\HL_Sdv_Grid.npy'
+    hl_str1 = 'Data\\HL_Sdv_Real.npy'
     ipa_str2 = 'Data\\IPA_Lsr_Real.npy'
-    hl_str2 = 'Data\\HL_Lsr_Grid.npy'
+    hl_str2 = 'Data\\HL_Lsr_Real.npy'
 
-os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed')
+os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\Preprocessed')
 nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 
+print('Nan values')
+print('--'*40)
 dt = datetime.timedelta(hours=24)
 fig, ax = plt.subplots(2, figsize=(8, 6))
-plt.title('test')
+Typ = 'sst'
 
-NAN = ([], [], [])
-tripa, trlsr, tgipa, tglsr, thl, thlr = [], [], [], [], [], []
-m = 0
-ls = ['-', '--', ':']
-cs = ['deepskyblue', 'forestgreen', 'gold', 'sandybrown']
-namelist = [('IPA', 'real'), ('IPA', 'grid'), ('HL', 'grid')]
+tipa = []
+tlsr = []
+thl = []
+thlr = []
 
-for name in namelist:
-    str1 = 'Data\\%s_Sdv_%s.npy' % (name[0], name[1])
-    str2 = 'Data\\%s_Lsr_%s.npy' % (name[0], name[1])
-    p = 0
-    for Season in Seasonlist:
-        sdv = []
-        lsr = []
+for Season in Seasonlist:
+    ipa = []
+    lsr = []
+    hl = []
+    hlr = []
+    print('Season = %s' % Season)
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\Preprocessed\%s' % Season)
+    GRID = np.load('coarse_grid_%s.npz' % Typ)
+    gridz = GRID['zi']
+    x2 = GRID['xi']
+    y2 = GRID['yi']
+    gridz = ma.masked_invalid(gridz)
+    GRID.close()
 
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\%s' % Season)
-        GRID = np.load('coarse_grid_sst.npz')
-        gridz = GRID['zi']
-        x2 = GRID['xi']
-        y2 = GRID['yi']
-        gridz = ma.masked_invalid(gridz)
-        GRID.close()
+    x1 = np.zeros((len(x2) - 1, len(y2) - 1))
+    for i in range(0, len(y2) - 1, 1):
+        x1[:, i] = x2[:-1]
+    x1 = np.transpose(x1)
+    y1 = np.zeros((len(y2) - 1, len(x2) - 1))
+    for i in range(0, len(x2) - 1, 1):
+        y1[:, i] = y2[:-1]
+    points = np.array((x1.flatten(), y1.flatten()))
 
-        x1 = np.zeros((len(x2) - 1, len(y2) - 1))
-        for i in range(0, len(y2) - 1, 1):
-            x1[:, i] = x2[:-1]
-        x1 = np.transpose(x1)
-        y1 = np.zeros((len(y2) - 1, len(x2) - 1))
-        for i in range(0, len(x2) - 1, 1):
-            y1[:, i] = y2[:-1]
-        points = np.array((x1.flatten(), y1.flatten()))
+    os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\%s\%s' % (Typ, Season))
+    TRUIPA = np.sqrt(np.load(r"100\%s" % ipa_str1))
+    TRUHL = np.sqrt(np.load(r"100\%s" % hl_str1))
+    TRULSR = np.load(r"100\%s" % ipa_str2)
+    TRUHLR = np.load(r"100\%s" % hl_str2)
 
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s' % Season)
-        TRUSDV = np.load(r"True\%s" % str1)
-        TRULSR = np.load(r"True\%s" % str2)
+    for M in [TRUHLR, TRULSR]:
+        M[M > 1] = np.nan
+        M[M < 0] = np.nan
 
-        TRUSDV = inter(TRUSDV, points)
-        TRULSR = inter(TRULSR, points)
+    Tru = np.sum(gridz.mask == True)
+    TMean = [np.nanmean(TRUIPA), np.nanmean(TRUHL), np.nanmean(TRULSR), np.nanmean(TRUHLR)]
+    TVar = [np.nanvar(TRUIPA), np.nanvar(TRUHL), np.nanvar(TRULSR), np.nanvar(TRUHLR)]
 
-        for N in nlist:  # Use every Nth observation. (N=1 is every observation)
-            os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%i' % (Season, 100 / N))
-            if os.path.isfile('%s' % str1) is False:
-                continue
-            else:
-                SDV = (np.load(str1))
-                LSR = np.load(str2)
+    #
+    # TRUIPA = inter(TRUIPA, points)
+    # TRULSR = inter(TRULSR, points)
+    # TRUHL = inter(TRUHL, points)
+    # TRUHLR = inter(TRUHLR, points)
 
-            SDV = inter(SDV, points)
-            LSR = inter(LSR, points)
+    for N in nlist:  # Use every Nth observation. (N=1 is every observation)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\%s\%s\%i' % (Typ, Season, 100 / N))
+        if os.path.isfile('%s' % ipa_str1) is False:
+            continue
+        elif os.path.isfile('%s' % hl_str1) is False:
+            continue
+        else:
+            IPA = np.sqrt(np.load('%s' % ipa_str1))
+            LSR = np.load('%s' % ipa_str2)
+            HL = np.sqrt(np.load('%s' % hl_str1))
+            HLR = np.load('%s' % hl_str2)
 
-            sdver = np.nanmean(abs(SDV - TRUSDV))
-            lsrer = np.nanmean(abs(LSR - TRULSR))
-            sdv.append(100*sdver/(np.nanmean(TRUSDV)+sdver))
-            lsr.append(100*lsrer/(np.nanmean(TRULSR)+lsrer))
+        for M in [LSR, HLR]:
+            M[M > 1] = np.nan
+            M[M < 0] = np.nan
 
-            ESIPA = np.sum(np.isnan(SDV))
-            ESLSR = np.sum(np.isnan(LSR))
+        Var = [np.nanvar(IPA), np.nanvar(HL), np.nanvar(LSR), np.nanvar(HLR)]
+        Mean = [np.nanmean(IPA), np.nanmean(HL), np.nanmean(LSR), np.nanmean(HLR)]
+        Covar = [np.nanmean((IPA-Mean[0])*(TRUIPA-TMean[0])), np.nanmean((HL-Mean[1])*(TRUHL-TMean[1])),
+                 np.nanmean((LSR-Mean[2])*(TRULSR-TMean[2])), np.nanmean((HLR-Mean[3])*(TRUHLR-TMean[3]))]
 
-            ES = (ESIPA - np.sum(gridz.mask))
-            EL = (ESLSR - np.sum(gridz.mask))
-            NAN[m].append('%s - %s: (%3.0f, %3.0f), Percentage = %3.0f ' % (name[0], name[1], ES, EL, 100/N))
+        ipa.append(1-(2*Covar[0]/(Var[0]+TVar[0] + (Mean[0]-TMean[0])**2)))
+        hl.append(1-(2*Covar[1]/(Var[1]+TVar[1] + (Mean[1]-TMean[1])**2)))
+        lsr.append(1-(2*Covar[2]/(Var[2]+TVar[2] + (Mean[2]-TMean[2])**2)))
+        hlr.append(1-(2*Covar[3]/(Var[3]+TVar[3] + (Mean[3]-TMean[3])**2)))
 
-        ax[0].plot((100/np.array(nlist)), sdv, c=cs[p], linestyle=ls[m])
-        ax[0].plot([0])
-        ax[0].set_ylabel('Standard deviation')
+        ESIPA = np.sum(np.isnan(IPA))
+        ESLSR = np.sum(np.isnan(LSR))
+        ESHL = np.sum(np.isnan(HL))
+        ESHLR = np.sum(np.isnan(HLR))
 
-        ax[1].plot((100/np.array(nlist)), lsr, c=cs[p], linestyle=ls[m])
-        ax[1].set_ylabel('Length-scale')
-        fig.text(0.5, 0.01, 'Percentage of observations', ha='center')
-        fig.text(0.01, 0.5, 'Percentage of corroboration', va='center', rotation='vertical')
-        if name[1] == 'real':
-            ax[0].plot([0], c=cs[p], label=Season)
-            if p == 3:
-                ax[0].legend()
+        EI = (ESIPA - Tru)
+        EL1 = (ESLSR - Tru)
+        EH = (ESHL - Tru)
+        EL2 = (ESHLR - Tru)
+        print('IPA: (%3.0f, %3.0f), HL: (%3.0f, %3.0f), Percentage = %3.0f ' % (EI, EL1, EH, EL2, 100/N))
 
-        if name[1] == 'real':
-            tripa.append(sdv)
-            trlsr.append(lsr)
-        elif name[0] == 'IPA' and name[1] == 'grid':
-            tgipa.append(sdv)
-            tglsr.append(lsr)
-        elif name[0] == 'HL':
-            thl.append(sdv)
-            thlr.append(lsr)
-        p += 1
-    m += 1
-for n in range(m):
-    ax[1].plot([0], c='k', linestyle=ls[n], label='%s - %s ' % (namelist[n][0], namelist[n][1]))
+    cs = ['deepskyblue', 'forestgreen', 'gold', 'sandybrown']
+    ax[0].plot((100/np.array(nlist)), ipa, c=cs[p], label=Season)
+    ax[0].plot((100/np.array(nlist)), hl, c=cs[p], linestyle=':')
+    ax[0].plot([0])
+
+    ax[1].plot((100/np.array(nlist)), lsr, c=cs[p])
+    ax[1].plot((100/np.array(nlist)), hlr, c=cs[p], linestyle=':')
+    fig.text(0.5, 0.01, 'Percentage of observations', ha='center')
+    fig.text(0.01, 0.5, 'Discordance', va='center', rotation='vertical')
+    ax[0].legend()
+
+    tipa.append(ipa)
+    thl.append(hl)
+    tlsr.append(lsr)
+    thlr.append(hlr)
+    p += 1
+fig.suptitle('Seasonal averages')
+ax[0].set_title('Standard deviation')
+ax[1].set_title('Length-scale ratio')
+ax[1].plot([0], c='k', label='IPA')
+ax[1].plot([0], c='k', linestyle=':', label='HL')
 ax[1].legend()
 plt.show()
 
 plt.figure('Average concordence - SDV')
-plt.title('Yearly average - SDV')
-plt.plot((100/np.array(nlist)), np.mean(tripa, axis=0), c='k', linestyle='-', label='IPA - real')
-plt.plot((100/np.array(nlist)), np.mean(tgipa, axis=0), c='k', linestyle='--', label='IPA - grid')
+plt.plot((100/np.array(nlist)), np.mean(tipa, axis=0), c='k', label='IPA')
 plt.plot((100/np.array(nlist)), np.mean(thl, axis=0), c='k', linestyle=':', label='HL')
-plt.ylabel('%')
-plt.xlabel('%')
+plt.ylim(0, 1)
+plt.ylabel('Discordance')
+plt.xlabel('Percentage of observations')
 plt.legend()
 
-plt.figure('Average concordence - LSR')
-plt.title('Yearly average - LSR')
-plt.plot((100/np.array(nlist)), np.mean(trlsr, axis=0), c='k',  linestyle='-', label='IPA - real')
-plt.plot((100/np.array(nlist)), np.mean(tglsr, axis=0), c='k',  linestyle='--', label='IPA - grid')
+plt.figure('Average discordance - LSR')
+plt.plot((100/np.array(nlist)), np.mean(tlsr, axis=0), c='k', label='IPA')
 plt.plot((100/np.array(nlist)), np.mean(thlr, axis=0), c='k', linestyle=':', label='HL')
-plt.ylabel('%')
-plt.xlabel('%')
+plt.ylim(0, 1)
+plt.ylabel('Discordance')
+plt.xlabel('Percentage of observations')
 plt.legend()
 plt.show()
-
-print(65*'__')
-print('Nan values')
-print('=='*65)
-for q in range(p-1):
-    print('Season - %s' % Seasonlist[q])
-    print(65*'--')
-    for n in range(len(nlist)):
-        print('%s || %s || %s' % (NAN[0][n + q*len(nlist)], NAN[1][n + q*len(nlist)], NAN[2][n + q*len(nlist)]))

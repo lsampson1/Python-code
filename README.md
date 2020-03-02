@@ -1,7 +1,7 @@
 # Python-code
-EEDiagnostics
+ErrorEstimation
 
-EEDiagnostics Python Code
+ErrorEstimation Python Code
 
 CLT.py :- Central Limit Theorem experiments.
 
@@ -20,3 +20,5 @@ Non-gridded IPA.py :- Produce the error variance and length-scale ratio by the I
 Non-gridded ANI.py :- Experimental anisotropic applications for IPA with 2D, anistropic distance.
 
 Plot.py :- Produce a plot for the IPA/HL results, also translate into model grid resolution, produce netcdf file and move into ocean.
+
+Preprocess.py :- Prepare the relevant files from the feedback data, rossby radius, depth profiles and model grid definitions.
