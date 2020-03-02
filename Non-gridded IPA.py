@@ -4,7 +4,8 @@ import datetime
 import numpy.ma as ma
 import time
 import random
-from numba import jit, njit
+# import matplotlib.pyplot as plt
+from numba import jit
 
 ########################################################################################################################
 #  Non-gridded IPA.npy
@@ -17,10 +18,12 @@ from numba import jit, njit
 #
 ########################################################################################################################
 
-MaxRadius = 900/(40000/360)
+KM2D = 40000/360
+MaxKM = 900
+MaxRadius = MaxKM/KM2D
 
 
-@jit('Tuple((f8[:], f8[:,:], f8))(f8[:], f8[:], f8[:], f4, i8, i8)', forceobj=True)
+@jit('Tuple((f8[:], f8[:,:], f8))(f8[:], f8[:], f4[:], f4, i8, i8)', nopython=True, parallel=True, forceobj=True)
 def time_loop(xti, yti, zti, i0, i1, daycount):
     tot = np.zeros(2)
     v = np.zeros(2)
@@ -30,24 +33,23 @@ def time_loop(xti, yti, zti, i0, i1, daycount):
         xxi = xti[tt]
         yyi = yti[tt]
         zzi = zti[tt]
-        if len(zzi) <= 1:
-            continue
-        rr = xxi*xxi + yyi*yyi
+        rr = (xxi*xxi + yyi*yyi)
+        if len(rr) < 1:
+            break
         v0idx = np.argmin(rr)
         v0 = zzi[v0idx]
 
-        tot, e = inner(rr, zzi, v0, v0idx, e, tot, i0, i1)
+        tot, e = inner(rr, zzi, v0, e, tot, i0, i1)
         v[0] += v0**2
         v[1] += 1
     return tot, e, v[0]/v[1]
 
 
-@njit('Tuple((f8[:], f8[:,:]))(f8[:], f4[:], f4, i8, f8[:,:], f8[:], f8, f8)', parallel=True, fastmath=True)
-def inner(rr, zzi, v0, v0idx, e, tot, i0, i1):
-
+@jit('Tuple((f8[:], f8[:,:]))(f8[:], f4[:], f4, f8[:,:], f8[:], f8, f8)', nopython=True, parallel=True, fastmath=True)
+def inner(rr, zzi, v0, e, tot, i0, i1):
     exp, sm = np.exp, np.sum
-    idd = rr < np.radians(MaxRadius)*np.radians(MaxRadius)
-    idd[v0idx] = False
+    idd = rr < MaxRadius*MaxRadius
+    idd[zzi == v0] = False
 
     ya = exp(-(rr[idd]) / (2 * i0 * i0))
     yb = exp(-(rr[idd]) / (2 * i1 * i1))
@@ -74,7 +76,7 @@ xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]  # "1-DJF", "2-MAM", "3-JJA", "4-SON"
 Overwrite = True
-a1 = 4  # Long length-scale, in degrees.
+a1 = 4.0  # Long length-scale, in degrees.
 Typ = 'sst'
 
 #  Ross = (Ross/1000)/(40000/360) # m to degrees, according to https://stackoverflow.com/questions/5217348/how-do-i-conv
@@ -83,7 +85,7 @@ Typ = 'sst'
 size = []
 TIME = []
 dt = datetime.timedelta(hours=24)
-nlist = [100/0.1, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
+nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 for N in nlist:  # Use every Nth observation. (N=1 is every observation)
     for Season in Seasonlist:
         S1 = time.time()
@@ -109,7 +111,7 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
             exit(0)
 
         dayCount = (End - Start).days
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_%s' % Typ)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\Preprocessed\Innovations_%s' % Typ)
 
         random.seed(100)
         ze = []
@@ -117,7 +119,7 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
             for t in range(dayCount):
                 date = Start + t * dt
                 # Open and save all innovations,
-                #  Observations chosen as a random 1/N % of the whole data set. Seeded with 100.
+                # Observations chosen as a random 1/N % of the whole data set. Seeded with 100.
 
                 dat = np.load('%i/%04i-%02i-%02i.npz' % (date.year, date.year, date.month, date.day))
                 idx = sorted(random.sample(list(np.arange(len(dat['zi'][:, 0]))), k=int(len(dat['zi'][:, 0]) / N)))
@@ -138,55 +140,55 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
         # ross = interpolate.griddata((rlon, rlat), np.array(Ross), (x2, y2), 'nearest')
 
         ross = np.load('rossby.npy')
-        ross = (ross / 1000) / (40000 / 360)
+        ross = (ross / 1000) / KM2D
 
         STD, LSR, obs = np.array(np.zeros_like(gridz)), np.array(np.zeros_like(gridz)), np.array(np.zeros_like(gridz))
 
-        for i, x in enumerate(xcenter):
-            if np.sum(gridz.mask[:, i]) == 86:
+        for i, y in enumerate(ycenter):
+            if np.sum(gridz.mask[i, :]) == 99:
                 continue
-            xiX = []
-            yiX = []
-            ziX = []
+            print(i, time.time() - S1)
+
+            xiY = []
+            yiY = []
+            ziY = []
 
             for t in range(dayCount):
-                idx = (abs(Xi[t] - x) <= MaxRadius)
-                xiX.append(Xi[t][idx])
-                yiX.append(Yi[t][idx])
-                ziX.append(Zi[t][idx])
+                idx = (abs(Yi[t] - y) <= MaxRadius)
+                xiY.append(Xi[t][idx])
+                yiY.append(Yi[t][idx])
+                ziY.append(Zi[t][idx])
 
-            for j, y in enumerate(ycenter):
-                if np.sum(gridz.mask[j, i]) == 1:
+            for j, x in enumerate(xcenter):
+                if np.sum(gridz.mask[i, j]) == 1:
                     continue
                 S2 = time.time()
 
-                a0 = ross[j, i]
+                a0 = ross[i, j]
                 xi = []
                 yi = []
                 zi = []
                 for t in range(0, dayCount):  # 'Box Cut', removes all values more than 9 degrees in x or y.
-                    idx = (abs(yiX[t] - y) <= MaxRadius)
-                    xi.append(np.radians(xiX[t][idx]-x))
-                    yi.append(np.radians(yiX[t][idx]-y))
-                    zi.append(ziX[t][idx])
+                    idx = (abs(xiY[t] - x) <= MaxRadius)
+                    xi.append((xiY[t][idx]-x))
+                    yi.append((yiY[t][idx]-y))
+                    zi.append(ziY[t][idx])
 
-                TOT, E, V = time_loop(xi, yi, zi, np.radians(a0), np.radians(a1), dayCount)
-                # print(time.time()-S2)
+                TOT, E, V = time_loop(xi, yi, zi, a0, a1, dayCount)
                 mm = np.linalg.solve(E, np.asmatrix(TOT).T)
 
                 af = mm[0]/(mm[1]+mm[0])
                 mf = mm[1]+mm[0]
-
-                STD[j, i] = mf
-                LSR[j, i] = af
-                obs[j, i] = V - mf
+                STD[i, j] = mf
+                LSR[i, j] = af
+                obs[i, j] = V - mf
         LSR[LSR == 0] = np.nan
         STD[STD == 0] = np.nan
         obs[obs == 0] = np.nan
 
         print(time.time()-S1)
         TIME.append(time.time()-S1)
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), Season))
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\%s\%s' % (Typ.upper(), Season))
         if os.path.isdir('%i/Data' % (100/N)) is False:
             os.makedirs('%i/Data' % (100/N))
         np.save(r"%i\Data\IPA_Sdv_Real.npy" % (100/N), STD)

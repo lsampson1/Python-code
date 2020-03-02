@@ -17,7 +17,6 @@ from numba import jit
 #  coarse_grid_sst.npz (for the chosen seasons), and a rossby radius .npy file.
 #
 ########################################################################################################################
-
 KM2D = 40000/360
 BinSize = 30
 MaxKM = 900
@@ -38,8 +37,6 @@ def time_loop(xti, yti, zti, daycount):
         yyi = yti[tt]
         zzi = zti[tt]
         rr = np.sqrt(xxi*xxi + yyi*yyi)
-        if len(rr) <= 3:
-            continue
         fitcov, fitcovcount = binning(rr, zzi, fitcov, fitcovcount)
     fitcovcount[fitcovcount == 0] = np.nan
     cov = fitcov/fitcovcount
@@ -53,7 +50,7 @@ def time_loop(xti, yti, zti, daycount):
 
 
 @jit('Tuple((f8[:], f8[:]))(f8[:], f4[:], f8[:], f8[:])', nopython=True, parallel=True, fastmath=True)
-def binning(rr, zzi, fc, fcc,):
+def binning(rr, zzi, fc, fcc):
     v0idx = np.argmin(rr)
     v0 = zzi[v0idx]
     idd = rr < MaxRadius
@@ -75,15 +72,14 @@ xedges = np.linspace(45, 75, int(stepx))
 ycenter = 0.5 * (yedges[1:] + yedges[:-1])
 xcenter = 0.5 * (xedges[1:] + xedges[:-1])
 
-nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 Seasonlist = ["1-DJF", "2-MAM", "3-JJA", "4-SON"]  # "1-DJF", "2-MAM", "3-JJA", "4-SON"
 Overwrite = True
 a1 = 4  # Long length-scale, in degrees.
 Typ = 'sst'
-
 size = []
 TIME = []
 dt = datetime.timedelta(hours=24)
+nlist = [100/100, 100/90, 100/70, 100/50, 100/30, 100/10, 100/1]
 for N in nlist:  # Use every Nth observation. (N=1 is every observation)
     for Season in Seasonlist:
         S1 = time.time()
@@ -109,7 +105,7 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
             exit(0)
 
         dayCount = (End - Start).days
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\Preprocessed\coarse_grid_%s' % Typ)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\Preprocessed\Innovations_%s' % Typ)
 
         random.seed(100)
         ze = []
@@ -133,9 +129,6 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
         gridz = GRID['zi']
         gridz = ma.masked_invalid(gridz)
         GRID.close()
-
-        #  Load rossby radius in terms of the coarse grid. Commented sections kept incase of need for recalculation.
-        # ross = interpolate.griddata((rlon, rlat), np.array(Ross), (x2, y2), 'nearest')
 
         ross = np.load('rossby.npy')
         ross = (ross / 1000) / KM2D
@@ -174,8 +167,8 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
 
                 def func(xx, xa, xb):  # The function is created anew, as it is dependent on the Rossby radius.
                     return xa * np.exp(-(xx ** 2) / (2 * a0 ** 2)) + xb * np.exp(-(xx ** 2) / (2 * a1 ** 2))
+
                 a, b, V = time_loop(xi, yi, zi, dayCount)
-                # print(time.time()-S2)
                 af = a/(a+b)
                 mf = a+b
                 STD[i, j] = mf
@@ -187,15 +180,15 @@ for N in nlist:  # Use every Nth observation. (N=1 is every observation)
 
         print(time.time()-S1)
         TIME.append(time.time()-S1)
-        os.chdir(r'\\POFCDisk1\PhD_Lewis\EEDiagnostics\%s\%s' % (Typ.upper(), Season))
-        if os.path.isdir('%i/test' % (100/N)) is False:
-            os.makedirs('%i/test' % (100/N))
-        np.save(r"%i\test\Data\IPA_Sdv_Real.npy" % (100/N), STD)
-        np.save(r"%i\test\Data\IPA_Obs_Real.npy" % (100/N), obs)
-        np.save(r"%i\test\Data\IPA_Lsr_Real.npy" % (100/N), LSR)
+        os.chdir(r'\\POFCDisk1\PhD_Lewis\ErrorEstimation\%s\%s' % (Typ.upper(), Season))
+        if os.path.isdir('%i/Data' % (100/N)) is False:
+            os.makedirs('%i/Data' % (100/N))
+        np.save(r"%i\Data\HL_Sdv_Real.npy" % (100/N), STD)
+        np.save(r"%i\Data\HL_Obs_Real.npy" % (100/N), obs)
+        np.save(r"%i\Data\HL_Lsr_Real.npy" % (100/N), LSR)
 
 os.chdir('../')
-txt = open('IPA Diagnostics-test.txt', 'w+')
+txt = open('HL Diagnostics-Real.txt', 'w+')
 txt.write('    Time    |    N     |    Season    |    Obs    \n')
 m = 0
 for N in nlist:
@@ -204,3 +197,5 @@ for N in nlist:
             TIME[p2+m], 1/N, Seasonlist[p2], int(size[p2+m])))
     m += len(Seasonlist)
 txt.close()
+
+
